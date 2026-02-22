@@ -36,7 +36,7 @@
 
         <div class="field-group">
           <label for="knobCount">Knob / Encoder Count</label>
-          <input id="knobCount" type="number" min="1" max="8" />
+          <input id="knobCount" type="number" min="1" max="2" />
         </div>
 
         <div class="button-row">
@@ -58,20 +58,6 @@
         <h2>Keyboard Layout</h2>
         <p class="hint">Select a key to edit its action.</p>
         <div id="keyGrid" class="key-grid"></div>
-      </section>
-
-      <section class="panel encoder-panel">
-        <h2>Knobs / Encoders</h2>
-        <p class="hint">
-          Per ogni knob imposta l'azione quando giri a sinistra (CCW) o a
-          destra (CW). Per lo scroll usa "Scroll su" e "Scroll giu".
-        </p>
-        <div class="button-row">
-          <button id="applyScrollPresetButton" type="button">
-            Preset: scroll su/giu su tutti i knob
-          </button>
-        </div>
-        <div id="encoderList" class="encoder-list"></div>
       </section>
 
       <section class="panel editor-panel">
@@ -142,6 +128,23 @@
             <select id="macroSelect"></select>
           </div>
         </div>
+      </section>
+
+      <section class="panel encoder-panel">
+        <h2>Knobs / Encoders</h2>
+        <p class="hint">
+          Creator Micro: 2 manopole. Per ogni knob imposta CCW/CW con tasto
+          singolo o scorciatoia (esempio: Alt + Scroll giu).
+        </p>
+        <div class="button-row">
+          <button id="applyScrollPresetButton" type="button">
+            Preset: scroll su/giu su tutti i knob
+          </button>
+          <button id="applyAltScrollPresetButton" type="button">
+            Preset knob 2: Alt + scroll su/giu
+          </button>
+        </div>
+        <div id="encoderList" class="encoder-list"></div>
       </section>
 
       <section class="panel macro-panel">

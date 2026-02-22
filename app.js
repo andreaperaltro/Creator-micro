@@ -1,9 +1,9 @@
 const STORAGE_KEY = "creator-micro-mapper-profile-v1";
 const DEFAULT_KEY_COUNT = 12;
 const DEFAULT_LAYER_COUNT = 3;
-const DEFAULT_KNOB_COUNT = 3;
+const DEFAULT_KNOB_COUNT = 2;
 const MAX_KEY_COUNT = 64;
-const MAX_KNOB_COUNT = 8;
+const MAX_KNOB_COUNT = 2;
 const MODIFIER_ORDER = ["LCTL", "LSFT", "LALT", "LGUI"];
 const MODIFIER_NAMES = {
   LCTL: "Ctrl",
@@ -157,6 +157,7 @@ const elements = {
   knobCount: document.getElementById("knobCount"),
   encoderList: document.getElementById("encoderList"),
   applyScrollPresetButton: document.getElementById("applyScrollPresetButton"),
+  applyAltScrollPresetButton: document.getElementById("applyAltScrollPresetButton"),
   keyGrid: document.getElementById("keyGrid"),
   selectedKeyLabel: document.getElementById("selectedKeyLabel"),
   actionType: document.getElementById("actionType"),
@@ -201,10 +202,25 @@ function createLayer(keyCount) {
   return Array.from({ length: keyCount }, () => createDefaultAssignment());
 }
 
+function createEncoderAction(type = "keycode", seed = {}) {
+  if (type === "shortcut") {
+    return {
+      type: "shortcut",
+      keycode: sanitizeKeycode(seed.keycode),
+      modifiers: sanitizeShortcutModifiers(seed.modifiers),
+    };
+  }
+
+  return {
+    type: "keycode",
+    keycode: sanitizeKeycode(seed.keycode),
+  };
+}
+
 function createDefaultEncoderBinding() {
   return {
-    ccw: "KC_NO",
-    cw: "KC_NO",
+    ccw: createEncoderAction("keycode", { keycode: "KC_NO" }),
+    cw: createEncoderAction("keycode", { keycode: "KC_NO" }),
   };
 }
 
@@ -437,14 +453,49 @@ function sanitizeAssignment(raw) {
   };
 }
 
+function sanitizeEncoderAction(raw) {
+  if (!raw) {
+    return createEncoderAction("keycode", { keycode: "KC_NO" });
+  }
+
+  if (typeof raw === "string") {
+    const parsedShortcut = parseWrappedShortcutToken(raw);
+    return parsedShortcut
+      ? createEncoderAction("shortcut", parsedShortcut)
+      : createEncoderAction("keycode", { keycode: raw });
+  }
+
+  const rawType = String(raw.type || "").trim().toLowerCase();
+  if (rawType === "shortcut") {
+    return createEncoderAction("shortcut", {
+      keycode: raw.keycode,
+      modifiers: raw.modifiers,
+    });
+  }
+
+  const parsedFromKeycode = parseWrappedShortcutToken(raw.keycode);
+  if (parsedFromKeycode) {
+    return createEncoderAction("shortcut", parsedFromKeycode);
+  }
+
+  if (Array.isArray(raw.modifiers) && raw.modifiers.length > 0) {
+    return createEncoderAction("shortcut", {
+      keycode: raw.keycode,
+      modifiers: raw.modifiers,
+    });
+  }
+
+  return createEncoderAction("keycode", { keycode: raw.keycode });
+}
+
 function sanitizeEncoderBinding(raw) {
   if (!raw || typeof raw !== "object") {
     return createDefaultEncoderBinding();
   }
 
   return {
-    ccw: sanitizeKeycode(raw.ccw),
-    cw: sanitizeKeycode(raw.cw),
+    ccw: sanitizeEncoderAction(raw.ccw),
+    cw: sanitizeEncoderAction(raw.cw),
   };
 }
 
@@ -528,6 +579,8 @@ function normalizeImportedState(raw) {
 
   const sourceEncoders = Array.isArray(raw?.encoders)
     ? raw.encoders
+    : Array.isArray(raw?.viaPreview?.encoderTokens)
+      ? raw.viaPreview.encoderTokens
     : Array.isArray(raw?.viaPreview?.encoders)
       ? raw.viaPreview.encoders
       : [];
@@ -769,6 +822,118 @@ function ensureEncoderStateConsistency() {
   );
 }
 
+function encoderActionToViaToken(action) {
+  const normalized = sanitizeEncoderAction(action);
+  if (normalized.type === "shortcut") {
+    return buildShortcutToken(normalized.modifiers, normalized.keycode);
+  }
+  return sanitizeKeycode(normalized.keycode);
+}
+
+function encoderActionToLabel(action) {
+  const normalized = sanitizeEncoderAction(action);
+  if (normalized.type === "shortcut") {
+    return readableShortcutLabel(normalized.modifiers, normalized.keycode);
+  }
+  return keycodeToFriendlyLabel(normalized.keycode);
+}
+
+function buildEncoderDirectionEditor({
+  parent,
+  binding,
+  directionKey,
+  title,
+}) {
+  const directionWrapper = document.createElement("div");
+  directionWrapper.className = "encoder-direction";
+
+  const heading = document.createElement("h4");
+  heading.className = "encoder-direction-title";
+  heading.textContent = title;
+  directionWrapper.appendChild(heading);
+
+  const action = sanitizeEncoderAction(binding[directionKey]);
+  binding[directionKey] = action;
+
+  const typeField = document.createElement("div");
+  typeField.className = "field-group compact";
+  const typeLabel = document.createElement("label");
+  typeLabel.textContent = "Tipo azione";
+  const typeSelect = document.createElement("select");
+  const keyOption = document.createElement("option");
+  keyOption.value = "keycode";
+  keyOption.textContent = "Tasto singolo";
+  const shortcutOption = document.createElement("option");
+  shortcutOption.value = "shortcut";
+  shortcutOption.textContent = "Scorciatoia";
+  typeSelect.append(keyOption, shortcutOption);
+  typeSelect.value = action.type;
+  typeSelect.addEventListener("change", () => {
+    const nextType = typeSelect.value === "shortcut" ? "shortcut" : "keycode";
+    binding[directionKey] = createEncoderAction(nextType, {
+      keycode: action.keycode,
+      modifiers: action.modifiers,
+    });
+    renderEncoderList();
+    renderPreview();
+  });
+  typeField.append(typeLabel, typeSelect);
+  directionWrapper.appendChild(typeField);
+
+  const keyField = document.createElement("div");
+  keyField.className = "field-group compact";
+  const keyLabel = document.createElement("label");
+  keyLabel.textContent = "Azione base";
+  const keySelect = document.createElement("select");
+  populateFriendlyKeySelect(keySelect);
+  ensureSelectContainsValue(keySelect, action.keycode);
+  keySelect.addEventListener("change", () => {
+    binding[directionKey].keycode = sanitizeKeycode(keySelect.value);
+    renderEncoderList();
+    renderPreview();
+  });
+  keyField.append(keyLabel, keySelect);
+  directionWrapper.appendChild(keyField);
+
+  if (action.type === "shortcut") {
+    const modifiersRow = document.createElement("div");
+    modifiersRow.className = "encoder-modifiers";
+    const modifierSet = new Set(sanitizeShortcutModifiers(action.modifiers));
+
+    MODIFIER_ORDER.forEach((modifier) => {
+      const label = document.createElement("label");
+      label.className = "encoder-modifier-pill";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = modifier;
+      checkbox.checked = modifierSet.has(modifier);
+      checkbox.addEventListener("change", () => {
+        const nextModifiers = Array.from(
+          modifiersRow.querySelectorAll("input:checked"),
+        ).map((input) => input.value);
+        binding[directionKey].modifiers = sanitizeShortcutModifiers(nextModifiers);
+        renderEncoderList();
+        renderPreview();
+      });
+      const text = document.createElement("span");
+      text.textContent = MODIFIER_NAMES[modifier] || modifier;
+      label.append(checkbox, text);
+      modifiersRow.appendChild(label);
+    });
+
+    directionWrapper.appendChild(modifiersRow);
+  }
+
+  const preview = document.createElement("p");
+  preview.className = "encoder-direction-preview";
+  preview.textContent = `Output: ${encoderActionToLabel(binding[directionKey])} (${encoderActionToViaToken(
+    binding[directionKey],
+  )})`;
+  directionWrapper.appendChild(preview);
+
+  parent.appendChild(directionWrapper);
+}
+
 function renderEncoderList() {
   ensureEncoderStateConsistency();
   elements.encoderList.textContent = "";
@@ -785,39 +950,23 @@ function renderEncoderList() {
     const grid = document.createElement("div");
     grid.className = "encoder-grid";
 
-    const ccwField = document.createElement("div");
-    ccwField.className = "field-group";
-    const ccwLabel = document.createElement("label");
-    ccwLabel.textContent = "Giro a sinistra (CCW)";
-    const ccwSelect = document.createElement("select");
-    populateFriendlyKeySelect(ccwSelect);
-    ensureSelectContainsValue(ccwSelect, binding.ccw);
-    ccwSelect.addEventListener("change", () => {
-      binding.ccw = sanitizeKeycode(ccwSelect.value);
-      renderEncoderList();
-      renderPreview();
+    buildEncoderDirectionEditor({
+      parent: grid,
+      binding,
+      directionKey: "ccw",
+      title: "Giro a sinistra (CCW)",
     });
-    ccwField.append(ccwLabel, ccwSelect);
 
-    const cwField = document.createElement("div");
-    cwField.className = "field-group";
-    const cwLabel = document.createElement("label");
-    cwLabel.textContent = "Giro a destra (CW)";
-    const cwSelect = document.createElement("select");
-    populateFriendlyKeySelect(cwSelect);
-    ensureSelectContainsValue(cwSelect, binding.cw);
-    cwSelect.addEventListener("change", () => {
-      binding.cw = sanitizeKeycode(cwSelect.value);
-      renderEncoderList();
-      renderPreview();
+    buildEncoderDirectionEditor({
+      parent: grid,
+      binding,
+      directionKey: "cw",
+      title: "Giro a destra (CW)",
     });
-    cwField.append(cwLabel, cwSelect);
-
-    grid.append(ccwField, cwField);
 
     const preview = document.createElement("p");
     preview.className = "encoder-preview";
-    preview.textContent = `CCW: ${keycodeToFriendlyLabel(binding.ccw)} · CW: ${keycodeToFriendlyLabel(
+    preview.textContent = `CCW: ${encoderActionToLabel(binding.ccw)} · CW: ${encoderActionToLabel(
       binding.cw,
     )}`;
 
@@ -1289,8 +1438,17 @@ function buildExportPayload() {
   const exportedEncoders = state.encoders.map((layer) =>
     layer.map((binding) => sanitizeEncoderBinding(binding)),
   );
+  const encoderTokens = exportedEncoders.map((layer) =>
+    layer.map((binding) => ({
+      ccw: encoderActionToViaToken(binding.ccw),
+      cw: encoderActionToViaToken(binding.cw),
+    })),
+  );
   const viaEncoderMap = exportedEncoders.map((layer) =>
-    layer.map((binding) => `ENCODER_CCW_CW(${binding.ccw}, ${binding.cw})`),
+    layer.map(
+      (binding) =>
+        `ENCODER_CCW_CW(${encoderActionToViaToken(binding.ccw)}, ${encoderActionToViaToken(binding.cw)})`,
+    ),
   );
   const exportedMacros = state.macros.map((macro) => {
     if (!Array.isArray(macro.steps)) {
@@ -1324,6 +1482,7 @@ function buildExportPayload() {
     viaPreview: {
       layers: viaLayers,
       encoders: exportedEncoders,
+      encoderTokens,
       encoderMap: viaEncoderMap,
       macros: exportedMacros.map((macro) => macro.body),
     },
@@ -1341,10 +1500,10 @@ function renderAll() {
   elements.knobCount.value = String(state.knobCount);
   renderLayerSelect();
   renderGrid();
+  renderEditor();
   renderEncoderList();
   renderMacroSelect();
   renderMacroList();
-  renderEditor();
   renderPreview();
 }
 
@@ -1464,8 +1623,8 @@ function bindEvents() {
   elements.layerSelect.addEventListener("change", (event) => {
     state.activeLayer = clamp(Number(event.target.value), 0, state.layers.length - 1);
     renderGrid();
-    renderEncoderList();
     renderEditor();
+    renderEncoderList();
     renderPreview();
   });
 
@@ -1570,12 +1729,34 @@ function bindEvents() {
     ensureEncoderStateConsistency();
     const activeLayerEncoders = state.encoders[state.activeLayer];
     for (const encoder of activeLayerEncoders) {
-      encoder.ccw = "KC_WH_U";
-      encoder.cw = "KC_WH_D";
+      encoder.ccw = createEncoderAction("keycode", { keycode: "KC_WH_U" });
+      encoder.cw = createEncoderAction("keycode", { keycode: "KC_WH_D" });
     }
     renderEncoderList();
     renderPreview();
     setStatus("Preset scroll applicato ai knob del layer corrente.");
+  });
+
+  elements.applyAltScrollPresetButton.addEventListener("click", () => {
+    ensureEncoderStateConsistency();
+    const activeLayerEncoders = state.encoders[state.activeLayer];
+    const targetEncoder = activeLayerEncoders[1] || activeLayerEncoders[0];
+    if (!targetEncoder) {
+      return;
+    }
+
+    targetEncoder.ccw = createEncoderAction("shortcut", {
+      modifiers: ["LALT"],
+      keycode: "KC_WH_U",
+    });
+    targetEncoder.cw = createEncoderAction("shortcut", {
+      modifiers: ["LALT"],
+      keycode: "KC_WH_D",
+    });
+
+    renderEncoderList();
+    renderPreview();
+    setStatus("Preset Alt+scroll applicato al knob di scroll.");
   });
 
   elements.saveLocalButton.addEventListener("click", saveToLocalStorage);
