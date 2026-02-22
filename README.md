@@ -44,10 +44,10 @@ If your production branch is `main`, merge these changes into `main` first.
 
 1. Choose a layer.
 2. Click a key in the layout grid.
-3. In **Key Editor**, choose action type:
-   - **Tasto singolo**: choose a key from readable labels
-   - **Scorciatoia**: select modifiers + base key
-   - **Macro**: choose one of the macros from the macro panel
+3. In **Key Editor**:
+   - select the base key from readable labels
+   - add modifiers to automatically turn it into a shortcut
+   - enable macro toggle only when you want macro assignment
 4. Add/edit macros in the **Macros** panel with visual steps.
 5. Configure **Knobs / Encoders** for CCW/CW actions (for example `Scroll su` / `Scroll giu` or `Alt + Scroll`).
 6. Export JSON when done.

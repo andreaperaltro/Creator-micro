@@ -54,19 +54,20 @@
           restano disponibili solo in "Avanzato".
         </p>
 
-        <div class="field-group">
-          <label for="actionType">Action Type</label>
-          <select id="actionType">
-            <option value="keycode">Tasto singolo</option>
-            <option value="shortcut">Scorciatoia</option>
-            <option value="macro">Macro</option>
-          </select>
-        </div>
-
-        <div id="keycodeFields" class="editor-section">
+        <div id="keyActionFields" class="editor-section">
           <div class="field-group">
-            <label for="keycodeSelect">Tasto (layout ITA)</label>
+            <label for="keycodeSelect">Azione base (layout ITA)</label>
             <select id="keycodeSelect"></select>
+          </div>
+          <p class="hint">
+            Modificatori facoltativi: se ne selezioni uno o piu, diventa una
+            scorciatoia.
+          </p>
+          <div class="checkbox-row">
+            <label><input type="checkbox" value="LCTL" class="key-modifier" />Ctrl</label>
+            <label><input type="checkbox" value="LSFT" class="key-modifier" />Maiusc</label>
+            <label><input type="checkbox" value="LALT" class="key-modifier" />Alt</label>
+            <label><input type="checkbox" value="LGUI" class="key-modifier" />Cmd / Win</label>
           </div>
           <details class="advanced-details">
             <summary>Avanzato: codice VIA/QMK</summary>
@@ -75,37 +76,21 @@
               <input id="keycodeInput" type="text" placeholder="KC_A" />
             </div>
           </details>
+          <div class="field-group">
+            <label for="keyAssignmentFriendlyPreview">Output leggibile</label>
+            <input id="keyAssignmentFriendlyPreview" type="text" readonly />
+          </div>
+          <div class="field-group">
+            <label for="keyAssignmentPreview">Codice VIA generato</label>
+            <input id="keyAssignmentPreview" type="text" readonly />
+          </div>
         </div>
 
-        <div id="shortcutFields" class="editor-section hidden">
-          <p class="hint">
-            Crea la scorciatoia in modo visuale (esempio: Ctrl + Maiusc + S).
-          </p>
-          <div class="checkbox-row">
-            <label><input type="checkbox" value="LCTL" class="modifier" />Ctrl</label>
-            <label><input type="checkbox" value="LSFT" class="modifier" />Maiusc</label>
-            <label><input type="checkbox" value="LALT" class="modifier" />Alt</label>
-            <label><input type="checkbox" value="LGUI" class="modifier" />Cmd / Win</label>
-          </div>
-          <div class="field-group">
-            <label for="shortcutKeySelect">Tasto principale (layout ITA)</label>
-            <select id="shortcutKeySelect"></select>
-          </div>
-          <details class="advanced-details">
-            <summary>Avanzato: base keycode raw</summary>
-            <div class="field-group compact">
-              <label for="shortcutKeyInput">Base raw</label>
-              <input id="shortcutKeyInput" type="text" placeholder="KC_C" />
-            </div>
-          </details>
-          <div class="field-group">
-            <label for="shortcutFriendlyPreview">Scorciatoia leggibile</label>
-            <input id="shortcutFriendlyPreview" type="text" readonly />
-          </div>
-          <div class="field-group">
-            <label for="shortcutPreview">Codice VIA generato</label>
-            <input id="shortcutPreview" type="text" readonly />
-          </div>
+        <div class="field-group">
+          <label>
+            <input id="useMacroAssignment" type="checkbox" />
+            Usa macro per questo tasto
+          </label>
         </div>
 
         <div id="macroFields" class="editor-section hidden">

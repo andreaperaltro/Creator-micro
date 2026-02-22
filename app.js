@@ -160,16 +160,13 @@ const elements = {
   applyAltScrollPresetButton: document.getElementById("applyAltScrollPresetButton"),
   keyGrid: document.getElementById("keyGrid"),
   selectedKeyLabel: document.getElementById("selectedKeyLabel"),
-  actionType: document.getElementById("actionType"),
-  keycodeFields: document.getElementById("keycodeFields"),
-  shortcutFields: document.getElementById("shortcutFields"),
+  keyActionFields: document.getElementById("keyActionFields"),
   macroFields: document.getElementById("macroFields"),
   keycodeSelect: document.getElementById("keycodeSelect"),
   keycodeInput: document.getElementById("keycodeInput"),
-  shortcutKeySelect: document.getElementById("shortcutKeySelect"),
-  shortcutKeyInput: document.getElementById("shortcutKeyInput"),
-  shortcutFriendlyPreview: document.getElementById("shortcutFriendlyPreview"),
-  shortcutPreview: document.getElementById("shortcutPreview"),
+  keyAssignmentFriendlyPreview: document.getElementById("keyAssignmentFriendlyPreview"),
+  keyAssignmentPreview: document.getElementById("keyAssignmentPreview"),
+  useMacroAssignment: document.getElementById("useMacroAssignment"),
   macroSelect: document.getElementById("macroSelect"),
   macroList: document.getElementById("macroList"),
   addMacroButton: document.getElementById("addMacroButton"),
@@ -718,10 +715,17 @@ function keycodeToFriendlyLabel(keycode) {
   return KEY_LABEL_BY_CODE.get(normalized) || normalized;
 }
 
-function getCheckedModifiers() {
-  return Array.from(document.querySelectorAll(".modifier:checked")).map(
+function getCheckedKeyModifiers() {
+  return Array.from(document.querySelectorAll(".key-modifier:checked")).map(
     (checkbox) => checkbox.value,
   );
+}
+
+function setCheckedKeyModifiers(modifiers) {
+  const selected = new Set(sanitizeShortcutModifiers(modifiers));
+  document.querySelectorAll(".key-modifier").forEach((checkbox) => {
+    checkbox.checked = selected.has(checkbox.value);
+  });
 }
 
 function renderLayerSelect() {
@@ -977,12 +981,6 @@ function renderEncoderList() {
   });
 }
 
-function renderEditorSections(actionType) {
-  elements.keycodeFields.classList.toggle("hidden", actionType !== "keycode");
-  elements.shortcutFields.classList.toggle("hidden", actionType !== "shortcut");
-  elements.macroFields.classList.toggle("hidden", actionType !== "macro");
-}
-
 function renderMacroSelect() {
   const previousValue = elements.macroSelect.value;
   elements.macroSelect.textContent = "";
@@ -1006,19 +1004,39 @@ function renderMacroSelect() {
   elements.macroSelect.value = validValue;
 }
 
-function updateShortcutPreview() {
-  const modifiers = getCheckedModifiers();
-  const normalizedModifiers = sanitizeShortcutModifiers(modifiers);
-  const base = sanitizeKeycode(elements.shortcutKeyInput.value || elements.shortcutKeySelect.value);
-  const wrapped = buildShortcutToken(normalizedModifiers, base);
-  const readable = [...normalizedModifiers.map((m) => MODIFIER_NAMES[m] || m), keycodeToFriendlyLabel(base)].join(
-    " + ",
-  );
+function syncMacroEditorVisibility() {
+  const useMacro = Boolean(elements.useMacroAssignment.checked);
+  elements.keyActionFields.classList.toggle("hidden", useMacro);
+  elements.macroFields.classList.toggle("hidden", !useMacro);
+}
 
-  elements.shortcutKeyInput.value = base;
-  ensureSelectContainsValue(elements.shortcutKeySelect, base);
-  elements.shortcutPreview.value = wrapped;
-  elements.shortcutFriendlyPreview.value = readable;
+function updateKeyAssignmentPreview() {
+  const useMacro = Boolean(elements.useMacroAssignment.checked);
+  if (useMacro) {
+    const macroId = sanitizeMacroId(elements.macroSelect.value);
+    const macroIndex = state.macros.findIndex((macro) => macro.id === macroId);
+    const macro = state.macros.find((item) => item.id === macroId);
+    elements.keyAssignmentFriendlyPreview.value = macro
+      ? `Macro: ${macro.name}`
+      : "Macro non selezionata";
+    elements.keyAssignmentPreview.value =
+      macroIndex >= 0 ? `QK_MACRO_${macroIndex}` : "KC_NO";
+    return;
+  }
+
+  const base = sanitizeKeycode(elements.keycodeInput.value || elements.keycodeSelect.value);
+  const modifiers = sanitizeShortcutModifiers(getCheckedKeyModifiers());
+  const viaToken =
+    modifiers.length > 0 ? buildShortcutToken(modifiers, base) : base;
+  const readable =
+    modifiers.length > 0
+      ? readableShortcutLabel(modifiers, base)
+      : keycodeToFriendlyLabel(base);
+
+  elements.keycodeInput.value = base;
+  ensureSelectContainsValue(elements.keycodeSelect, base);
+  elements.keyAssignmentFriendlyPreview.value = readable;
+  elements.keyAssignmentPreview.value = viaToken;
 }
 
 function renderEditor() {
@@ -1026,34 +1044,28 @@ function renderEditor() {
   elements.selectedKeyLabel.textContent = `Layer ${state.activeLayer + 1} - Tasto ${
     state.selectedKey + 1
   }`;
-  elements.actionType.value = assignment.type;
-  renderEditorSections(assignment.type);
-
-  if (assignment.type === "keycode") {
-    const keycode = sanitizeKeycode(assignment.keycode);
-    elements.keycodeInput.value = keycode;
-    ensureSelectContainsValue(elements.keycodeSelect, keycode);
-  }
-
-  if (assignment.type === "shortcut") {
-    const modifiers = sanitizeShortcutModifiers(assignment.modifiers);
-    const selectedSet = new Set(modifiers);
-    document.querySelectorAll(".modifier").forEach((checkbox) => {
-      checkbox.checked = selectedSet.has(checkbox.value);
-    });
-
-    const keycode = sanitizeKeycode(assignment.keycode);
-    elements.shortcutKeyInput.value = keycode;
-    ensureSelectContainsValue(elements.shortcutKeySelect, keycode);
-    updateShortcutPreview();
-  }
+  renderMacroSelect();
 
   if (assignment.type === "macro") {
-    renderMacroSelect();
+    elements.useMacroAssignment.checked = true;
     if (state.macros.length > 0) {
       elements.macroSelect.value = assignment.macroId || state.macros[0].id;
     }
+  } else {
+    const keycode = sanitizeKeycode(assignment.keycode);
+    elements.keycodeInput.value = keycode;
+    ensureSelectContainsValue(elements.keycodeSelect, keycode);
+    elements.useMacroAssignment.checked = false;
+
+    if (assignment.type === "shortcut") {
+      setCheckedKeyModifiers(assignment.modifiers);
+    } else {
+      setCheckedKeyModifiers([]);
+    }
   }
+
+  syncMacroEditorVisibility();
+  updateKeyAssignmentPreview();
 }
 
 function readableShortcutLabel(modifiers, keycode) {
@@ -1510,36 +1522,33 @@ function renderAll() {
 }
 
 function updateSelectedAssignmentFromEditor() {
-  const actionType = elements.actionType.value;
+  const useMacro = Boolean(elements.useMacroAssignment.checked);
 
-  if (actionType === "keycode") {
-    const keycode = sanitizeKeycode(elements.keycodeInput.value || elements.keycodeSelect.value);
-    elements.keycodeInput.value = keycode;
-    ensureSelectContainsValue(elements.keycodeSelect, keycode);
-    setSelectedAssignment({
-      type: "keycode",
-      keycode,
-    });
-  } else if (actionType === "shortcut") {
-    const modifiers = sanitizeShortcutModifiers(getCheckedModifiers());
-    const keycode = sanitizeKeycode(
-      elements.shortcutKeyInput.value || elements.shortcutKeySelect.value,
-    );
-    elements.shortcutKeyInput.value = keycode;
-    ensureSelectContainsValue(elements.shortcutKeySelect, keycode);
-    setSelectedAssignment({ type: "shortcut", modifiers, keycode });
-    updateShortcutPreview();
-  } else if (actionType === "macro") {
+  if (useMacro) {
     if (state.macros.length === 0) {
       const id = generateNextMacroId();
       state.macros.push(createMacro(id, `Macro ${id.slice(1)}`));
     }
+    renderMacroSelect();
     setSelectedAssignment({
       type: "macro",
       macroId: sanitizeMacroId(elements.macroSelect.value) || state.macros[0].id,
     });
+  } else {
+    const keycode = sanitizeKeycode(elements.keycodeInput.value || elements.keycodeSelect.value);
+    const modifiers = sanitizeShortcutModifiers(getCheckedKeyModifiers());
+    elements.keycodeInput.value = keycode;
+    ensureSelectContainsValue(elements.keycodeSelect, keycode);
+
+    if (modifiers.length > 0) {
+      setSelectedAssignment({ type: "shortcut", modifiers, keycode });
+    } else {
+      setSelectedAssignment({ type: "keycode", keycode });
+    }
   }
 
+  syncMacroEditorVisibility();
+  updateKeyAssignmentPreview();
   renderMacroSelect();
   renderGrid();
   renderPreview();
@@ -1611,9 +1620,11 @@ function importJsonFile(file) {
 
 function initializeFriendlyInputs() {
   populateFriendlyKeySelect(elements.keycodeSelect);
-  populateFriendlyKeySelect(elements.shortcutKeySelect);
   ensureSelectContainsValue(elements.keycodeSelect, "KC_NO");
-  ensureSelectContainsValue(elements.shortcutKeySelect, "KC_NO");
+  setCheckedKeyModifiers([]);
+  elements.useMacroAssignment.checked = false;
+  syncMacroEditorVisibility();
+  updateKeyAssignmentPreview();
 }
 
 function bindEvents() {
@@ -1654,12 +1665,6 @@ function bindEvents() {
     setStatus(`Numero knob aggiornato a ${nextCount}.`);
   });
 
-  elements.actionType.addEventListener("change", () => {
-    renderEditorSections(elements.actionType.value);
-    updateSelectedAssignmentFromEditor();
-    renderEditor();
-  });
-
   elements.keycodeSelect.addEventListener("change", () => {
     const selectedCode = sanitizeKeycode(elements.keycodeSelect.value);
     elements.keycodeInput.value = selectedCode;
@@ -1683,39 +1688,14 @@ function bindEvents() {
     updateSelectedAssignmentFromEditor();
   });
 
-  elements.shortcutKeySelect.addEventListener("change", () => {
-    const selectedCode = sanitizeKeycode(elements.shortcutKeySelect.value);
-    elements.shortcutKeyInput.value = selectedCode;
-    updateShortcutPreview();
-    updateSelectedAssignmentFromEditor();
-  });
-
-  elements.shortcutKeyInput.addEventListener("input", () => {
-    const typed = normalizeTypedKeycode(elements.shortcutKeyInput.value);
-    if (!typed) {
-      return;
-    }
-    elements.shortcutKeyInput.value = typed;
-    ensureSelectContainsValue(elements.shortcutKeySelect, typed);
-    updateShortcutPreview();
-    updateSelectedAssignmentFromEditor();
-  });
-
-  elements.shortcutKeyInput.addEventListener("blur", () => {
-    const code = sanitizeKeycode(
-      elements.shortcutKeyInput.value || elements.shortcutKeySelect.value,
-    );
-    elements.shortcutKeyInput.value = code;
-    ensureSelectContainsValue(elements.shortcutKeySelect, code);
-    updateShortcutPreview();
-    updateSelectedAssignmentFromEditor();
-  });
-
-  document.querySelectorAll(".modifier").forEach((checkbox) => {
+  document.querySelectorAll(".key-modifier").forEach((checkbox) => {
     checkbox.addEventListener("change", () => {
-      updateShortcutPreview();
       updateSelectedAssignmentFromEditor();
     });
+  });
+
+  elements.useMacroAssignment.addEventListener("change", () => {
+    updateSelectedAssignmentFromEditor();
   });
 
   elements.macroSelect.addEventListener("change", updateSelectedAssignmentFromEditor);
