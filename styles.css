@@ -57,10 +57,12 @@ body {
 
 .encoder-panel {
   order: 4;
+  grid-column: 1 / -1;
 }
 
 .macro-panel {
   order: 5;
+  grid-column: 1 / -1;
 }
 
 .output-panel {
@@ -93,6 +95,7 @@ body {
   flex-direction: column;
   gap: 0.35rem;
   margin-bottom: 0.75rem;
+  min-width: 0;
 }
 
 .field-group.compact {
@@ -119,6 +122,9 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   padding: 0.45rem 0.6rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 textarea {
@@ -209,6 +215,7 @@ button,
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   padding: 0.6rem;
+  overflow: hidden;
 }
 
 .encoder-title {
@@ -220,12 +227,14 @@ button,
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .encoder-direction {
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   padding: 0.55rem;
+  min-width: 0;
 }
 
 .encoder-direction-title {
