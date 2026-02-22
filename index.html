@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="it">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,8 +11,8 @@
       <header class="app-header">
         <h1>Creator Micro Mapper</h1>
         <p>
-          Build key, shortcut, and macro profiles for a Work Louder Creator
-          Micro keyboard using VIA-style keycodes.
+          Configura il tuo Work Louder Creator Micro in modo semplice: scegli
+          tasti con nomi leggibili, crea scorciatoie, assegna macro.
         </p>
       </header>
 
@@ -58,47 +58,61 @@
       <section class="panel editor-panel">
         <h2>Key Editor</h2>
         <p id="selectedKeyLabel">No key selected.</p>
+        <p class="hint">
+          Modalita semplice: seleziona i tasti con nomi normali. I codici VIA
+          restano disponibili solo in "Avanzato".
+        </p>
 
         <div class="field-group">
           <label for="actionType">Action Type</label>
           <select id="actionType">
-            <option value="keycode">Keycode</option>
-            <option value="shortcut">Shortcut</option>
+            <option value="keycode">Tasto singolo</option>
+            <option value="shortcut">Scorciatoia</option>
             <option value="macro">Macro</option>
           </select>
         </div>
 
         <div id="keycodeFields" class="editor-section">
           <div class="field-group">
-            <label for="keycodeInput">VIA/QMK Keycode</label>
-            <input
-              id="keycodeInput"
-              type="text"
-              placeholder="KC_A"
-              list="commonKeycodes"
-            />
+            <label for="keycodeSelect">Tasto (layout ITA)</label>
+            <select id="keycodeSelect"></select>
           </div>
+          <details class="advanced-details">
+            <summary>Avanzato: codice VIA/QMK</summary>
+            <div class="field-group compact">
+              <label for="keycodeInput">Codice raw</label>
+              <input id="keycodeInput" type="text" placeholder="KC_A" />
+            </div>
+          </details>
         </div>
 
         <div id="shortcutFields" class="editor-section hidden">
-          <p class="hint">Generate a wrapped keycode such as LCTL(LSFT(KC_S)).</p>
+          <p class="hint">
+            Crea la scorciatoia in modo visuale (esempio: Ctrl + Maiusc + S).
+          </p>
           <div class="checkbox-row">
             <label><input type="checkbox" value="LCTL" class="modifier" />Ctrl</label>
-            <label><input type="checkbox" value="LSFT" class="modifier" />Shift</label>
+            <label><input type="checkbox" value="LSFT" class="modifier" />Maiusc</label>
             <label><input type="checkbox" value="LALT" class="modifier" />Alt</label>
-            <label><input type="checkbox" value="LGUI" class="modifier" />Gui</label>
+            <label><input type="checkbox" value="LGUI" class="modifier" />Cmd / Win</label>
           </div>
           <div class="field-group">
-            <label for="shortcutKeyInput">Base Keycode</label>
-            <input
-              id="shortcutKeyInput"
-              type="text"
-              placeholder="KC_C"
-              list="commonKeycodes"
-            />
+            <label for="shortcutKeySelect">Tasto principale (layout ITA)</label>
+            <select id="shortcutKeySelect"></select>
+          </div>
+          <details class="advanced-details">
+            <summary>Avanzato: base keycode raw</summary>
+            <div class="field-group compact">
+              <label for="shortcutKeyInput">Base raw</label>
+              <input id="shortcutKeyInput" type="text" placeholder="KC_C" />
+            </div>
+          </details>
+          <div class="field-group">
+            <label for="shortcutFriendlyPreview">Scorciatoia leggibile</label>
+            <input id="shortcutFriendlyPreview" type="text" readonly />
           </div>
           <div class="field-group">
-            <label for="shortcutPreview">Generated Shortcut</label>
+            <label for="shortcutPreview">Codice VIA generato</label>
             <input id="shortcutPreview" type="text" readonly />
           </div>
         </div>
@@ -125,59 +139,6 @@
         <textarea id="jsonPreview" readonly></textarea>
       </section>
     </main>
-
-    <datalist id="commonKeycodes">
-      <option value="KC_NO"></option>
-      <option value="KC_TRNS"></option>
-      <option value="KC_A"></option>
-      <option value="KC_B"></option>
-      <option value="KC_C"></option>
-      <option value="KC_D"></option>
-      <option value="KC_E"></option>
-      <option value="KC_F"></option>
-      <option value="KC_G"></option>
-      <option value="KC_H"></option>
-      <option value="KC_I"></option>
-      <option value="KC_J"></option>
-      <option value="KC_K"></option>
-      <option value="KC_L"></option>
-      <option value="KC_M"></option>
-      <option value="KC_N"></option>
-      <option value="KC_O"></option>
-      <option value="KC_P"></option>
-      <option value="KC_Q"></option>
-      <option value="KC_R"></option>
-      <option value="KC_S"></option>
-      <option value="KC_T"></option>
-      <option value="KC_U"></option>
-      <option value="KC_V"></option>
-      <option value="KC_W"></option>
-      <option value="KC_X"></option>
-      <option value="KC_Y"></option>
-      <option value="KC_Z"></option>
-      <option value="KC_1"></option>
-      <option value="KC_2"></option>
-      <option value="KC_3"></option>
-      <option value="KC_4"></option>
-      <option value="KC_5"></option>
-      <option value="KC_6"></option>
-      <option value="KC_7"></option>
-      <option value="KC_8"></option>
-      <option value="KC_9"></option>
-      <option value="KC_0"></option>
-      <option value="KC_ENT"></option>
-      <option value="KC_ESC"></option>
-      <option value="KC_TAB"></option>
-      <option value="KC_SPC"></option>
-      <option value="KC_BSPC"></option>
-      <option value="KC_DEL"></option>
-      <option value="KC_MUTE"></option>
-      <option value="KC_VOLU"></option>
-      <option value="KC_VOLD"></option>
-      <option value="KC_MPLY"></option>
-      <option value="KC_MNXT"></option>
-      <option value="KC_MPRV"></option>
-    </datalist>
 
     <script src="./app.js"></script>
   </body>

@@ -71,6 +71,10 @@ body {
   margin-bottom: 0.75rem;
 }
 
+.field-group.compact {
+  margin: 0.65rem 0 0.2rem;
+}
+
 label {
   font-size: 0.9rem;
   font-weight: 600;
@@ -173,6 +177,24 @@ button,
 
 .editor-section.hidden {
   display: none;
+}
+
+.advanced-details {
+  border: 1px dashed var(--border);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.advanced-details summary {
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.advanced-details[open] summary {
+  margin-bottom: 0.35rem;
 }
 
 .checkbox-row {

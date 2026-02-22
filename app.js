@@ -5,10 +5,118 @@ const MAX_KEY_COUNT = 64;
 const MODIFIER_ORDER = ["LCTL", "LSFT", "LALT", "LGUI"];
 const MODIFIER_NAMES = {
   LCTL: "Ctrl",
-  LSFT: "Shift",
+  LSFT: "Maiusc",
   LALT: "Alt",
-  LGUI: "Gui",
+  LGUI: "Cmd/Win",
 };
+
+const LETTER_KEYS = Array.from("ABCDEFGHIJKLMNOPQRSTUVWXYZ", (letter) => ({
+  code: `KC_${letter}`,
+  label: letter,
+}));
+
+const NUMBER_KEYS = Array.from("1234567890", (digit) => ({
+  code: `KC_${digit}`,
+  label: digit,
+}));
+
+const FUNCTION_KEYS = Array.from({ length: 12 }, (_, index) => ({
+  code: `KC_F${index + 1}`,
+  label: `F${index + 1}`,
+}));
+
+const FRIENDLY_KEY_GROUPS = [
+  {
+    label: "Comandi principali",
+    keys: [
+      { code: "KC_NO", label: "Nessun tasto" },
+      { code: "KC_TRNS", label: "Trasparente (layer inferiore)" },
+      { code: "KC_ESC", label: "Esc" },
+      { code: "KC_TAB", label: "Tab" },
+      { code: "KC_ENT", label: "Invio" },
+      { code: "KC_SPC", label: "Spazio" },
+      { code: "KC_BSPC", label: "Backspace" },
+      { code: "KC_DEL", label: "Canc" },
+      { code: "KC_INS", label: "Ins" },
+      { code: "KC_HOME", label: "Home" },
+      { code: "KC_END", label: "Fine" },
+      { code: "KC_PGUP", label: "Pagina su" },
+      { code: "KC_PGDN", label: "Pagina giu" },
+      { code: "KC_LEFT", label: "Freccia sinistra" },
+      { code: "KC_DOWN", label: "Freccia giu" },
+      { code: "KC_UP", label: "Freccia su" },
+      { code: "KC_RGHT", label: "Freccia destra" },
+    ],
+  },
+  {
+    label: "Lettere",
+    keys: LETTER_KEYS,
+  },
+  {
+    label: "Numeri",
+    keys: NUMBER_KEYS,
+  },
+  {
+    label: "Simboli (layout ITA, possono variare)",
+    keys: [
+      { code: "KC_MINS", label: "' / ? (tasto ITA)" },
+      { code: "KC_EQL", label: "i grave / ^ (tasto ITA)" },
+      { code: "KC_LBRC", label: "e grave / e acuto (tasto ITA)" },
+      { code: "KC_RBRC", label: "+ / * (tasto ITA)" },
+      { code: "KC_BSLS", label: "\\ / |" },
+      { code: "KC_SCLN", label: "o grave / c cediglia (tasto ITA)" },
+      { code: "KC_QUOT", label: "a grave / degree (tasto ITA)" },
+      { code: "KC_COMM", label: ", / ;" },
+      { code: "KC_DOT", label: ". / :" },
+      { code: "KC_SLSH", label: "- / _ (tasto ITA)" },
+      { code: "KC_NUBS", label: "< / > (ISO)" },
+    ],
+  },
+  {
+    label: "Tasti funzione",
+    keys: FUNCTION_KEYS,
+  },
+  {
+    label: "Numpad",
+    keys: [
+      { code: "KC_P0", label: "Numpad 0" },
+      { code: "KC_P1", label: "Numpad 1" },
+      { code: "KC_P2", label: "Numpad 2" },
+      { code: "KC_P3", label: "Numpad 3" },
+      { code: "KC_P4", label: "Numpad 4" },
+      { code: "KC_P5", label: "Numpad 5" },
+      { code: "KC_P6", label: "Numpad 6" },
+      { code: "KC_P7", label: "Numpad 7" },
+      { code: "KC_P8", label: "Numpad 8" },
+      { code: "KC_P9", label: "Numpad 9" },
+      { code: "KC_PDOT", label: "Numpad ." },
+      { code: "KC_PSLS", label: "Numpad /" },
+      { code: "KC_PAST", label: "Numpad *" },
+      { code: "KC_PMNS", label: "Numpad -" },
+      { code: "KC_PPLS", label: "Numpad +" },
+      { code: "KC_PENT", label: "Numpad Invio" },
+    ],
+  },
+  {
+    label: "Media",
+    keys: [
+      { code: "KC_MUTE", label: "Muto" },
+      { code: "KC_VOLU", label: "Volume +" },
+      { code: "KC_VOLD", label: "Volume -" },
+      { code: "KC_MPLY", label: "Play/Pausa" },
+      { code: "KC_MSTP", label: "Stop" },
+      { code: "KC_MNXT", label: "Traccia successiva" },
+      { code: "KC_MPRV", label: "Traccia precedente" },
+    ],
+  },
+];
+
+const KEY_LABEL_BY_CODE = new Map();
+for (const group of FRIENDLY_KEY_GROUPS) {
+  for (const key of group.keys) {
+    KEY_LABEL_BY_CODE.set(key.code, key.label);
+  }
+}
 
 const elements = {
   profileName: document.getElementById("profileName"),
@@ -26,8 +134,11 @@ const elements = {
   keycodeFields: document.getElementById("keycodeFields"),
   shortcutFields: document.getElementById("shortcutFields"),
   macroFields: document.getElementById("macroFields"),
+  keycodeSelect: document.getElementById("keycodeSelect"),
   keycodeInput: document.getElementById("keycodeInput"),
+  shortcutKeySelect: document.getElementById("shortcutKeySelect"),
   shortcutKeyInput: document.getElementById("shortcutKeyInput"),
+  shortcutFriendlyPreview: document.getElementById("shortcutFriendlyPreview"),
   shortcutPreview: document.getElementById("shortcutPreview"),
   macroSelect: document.getElementById("macroSelect"),
   macroList: document.getElementById("macroList"),
@@ -75,6 +186,12 @@ function sanitizeKeycode(value, fallback = "KC_NO") {
   return normalized.length > 0 ? normalized : fallback;
 }
 
+function normalizeTypedKeycode(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase();
+}
+
 function sanitizeMacroId(value) {
   return String(value || "").trim();
 }
@@ -93,13 +210,46 @@ function sanitizeShortcutModifiers(modifiers) {
   return unique;
 }
 
+function parseWrappedShortcutToken(token) {
+  const normalized = sanitizeKeycode(token);
+  const modifiers = [];
+  let remaining = normalized;
+
+  while (true) {
+    const wrappedMatch = remaining.match(/^([A-Z0-9_]+)\((.*)\)$/);
+    if (!wrappedMatch) {
+      break;
+    }
+
+    const modifier = wrappedMatch[1];
+    if (!MODIFIER_ORDER.includes(modifier)) {
+      break;
+    }
+
+    modifiers.push(modifier);
+    remaining = wrappedMatch[2];
+  }
+
+  if (modifiers.length === 0) {
+    return null;
+  }
+
+  return {
+    type: "shortcut",
+    modifiers: sanitizeShortcutModifiers(modifiers),
+    keycode: sanitizeKeycode(remaining),
+  };
+}
+
 function sanitizeAssignment(raw) {
   if (!raw) {
     return createDefaultAssignment();
   }
 
   if (typeof raw === "string") {
-    return { type: "keycode", keycode: sanitizeKeycode(raw) };
+    const normalized = sanitizeKeycode(raw);
+    const parsedShortcut = parseWrappedShortcutToken(normalized);
+    return parsedShortcut || { type: "keycode", keycode: normalized };
   }
 
   if (raw.type === "shortcut") {
@@ -117,9 +267,11 @@ function sanitizeAssignment(raw) {
     };
   }
 
-  return {
+  const keycode = sanitizeKeycode(raw.keycode);
+  const parsedShortcut = parseWrappedShortcutToken(keycode);
+  return parsedShortcut || {
     type: "keycode",
-    keycode: sanitizeKeycode(raw.keycode),
+    keycode,
   };
 }
 
@@ -136,6 +288,28 @@ function sanitizeMacro(rawMacro, index) {
   const body = String(rawMacro?.body || "");
   const id = sanitizeMacroId(rawMacro?.id) || `M${index + 1}`;
   return { id, name, body };
+}
+
+function coerceMacroTokensInLayers(layers, macros) {
+  for (const layer of layers) {
+    for (let index = 0; index < layer.length; index += 1) {
+      const assignment = layer[index];
+      if (assignment.type !== "keycode") {
+        continue;
+      }
+
+      const macroMatch = assignment.keycode.match(/^QK_MACRO_(\d+)$/);
+      if (!macroMatch) {
+        continue;
+      }
+
+      const macroIndex = Number(macroMatch[1]);
+      const macro = macros[macroIndex];
+      if (macro) {
+        layer[index] = { type: "macro", macroId: macro.id };
+      }
+    }
+  }
 }
 
 function normalizeImportedState(raw) {
@@ -161,6 +335,7 @@ function normalizeImportedState(raw) {
 
   const macrosRaw = Array.isArray(raw?.macros) ? raw.macros : [];
   const macros = macrosRaw.map((macro, index) => sanitizeMacro(macro, index));
+  coerceMacroTokensInLayers(layers, macros);
 
   return {
     profileName:
@@ -219,6 +394,57 @@ function ensureValidMacroAssignments() {
   }
 }
 
+function populateFriendlyKeySelect(selectElement) {
+  selectElement.textContent = "";
+
+  for (const group of FRIENDLY_KEY_GROUPS) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = group.label;
+
+    for (const key of group.keys) {
+      const option = document.createElement("option");
+      option.value = key.code;
+      option.textContent = key.label;
+      optgroup.appendChild(option);
+    }
+
+    selectElement.appendChild(optgroup);
+  }
+}
+
+function ensureSelectContainsValue(selectElement, keycode) {
+  const normalized = sanitizeKeycode(keycode);
+  const customOption = selectElement.querySelector("option[data-custom='true']");
+  if (customOption) {
+    customOption.remove();
+  }
+
+  const hasKnownOption = Array.from(selectElement.options).some(
+    (option) => option.value === normalized,
+  );
+
+  if (!hasKnownOption) {
+    const option = document.createElement("option");
+    option.value = normalized;
+    option.textContent = `Personalizzato (${normalized})`;
+    option.setAttribute("data-custom", "true");
+    selectElement.prepend(option);
+  }
+
+  selectElement.value = normalized;
+}
+
+function keycodeToFriendlyLabel(keycode) {
+  const normalized = sanitizeKeycode(keycode);
+  return KEY_LABEL_BY_CODE.get(normalized) || normalized;
+}
+
+function getCheckedModifiers() {
+  return Array.from(document.querySelectorAll(".modifier:checked")).map(
+    (checkbox) => checkbox.value,
+  );
+}
+
 function renderLayerSelect() {
   elements.layerSelect.textContent = "";
   state.layers.forEach((_, index) => {
@@ -250,19 +476,17 @@ function assignmentToViaToken(assignment) {
 function assignmentToLabel(assignment) {
   if (assignment.type === "macro") {
     const macro = state.macros.find((item) => item.id === assignment.macroId);
-    return macro ? `Macro: ${macro.name}` : "Macro: (missing)";
+    return macro ? `Macro: ${macro.name}` : "Macro: mancante";
   }
 
   if (assignment.type === "shortcut") {
     const modifierLabels = sanitizeShortcutModifiers(assignment.modifiers).map(
       (modifier) => MODIFIER_NAMES[modifier] || modifier,
     );
-    return `${modifierLabels.join("+")}${modifierLabels.length ? "+" : ""}${sanitizeKeycode(
-      assignment.keycode,
-    )}`;
+    return [...modifierLabels, keycodeToFriendlyLabel(assignment.keycode)].join(" + ");
   }
 
-  return sanitizeKeycode(assignment.keycode);
+  return keycodeToFriendlyLabel(assignment.keycode);
 }
 
 function renderGrid() {
@@ -327,28 +551,35 @@ function renderMacroSelect() {
 }
 
 function updateShortcutPreview() {
-  const modifiers = Array.from(document.querySelectorAll(".modifier:checked")).map(
-    (checkbox) => checkbox.value,
-  );
+  const modifiers = getCheckedModifiers();
   const normalizedModifiers = sanitizeShortcutModifiers(modifiers);
-  const base = sanitizeKeycode(elements.shortcutKeyInput.value);
+  const base = sanitizeKeycode(elements.shortcutKeyInput.value || elements.shortcutKeySelect.value);
   const wrapped = normalizedModifiers.reduceRight(
     (current, modifier) => `${modifier}(${current})`,
     base,
   );
+  const readable = [...normalizedModifiers.map((m) => MODIFIER_NAMES[m] || m), keycodeToFriendlyLabel(base)].join(
+    " + ",
+  );
+
+  elements.shortcutKeyInput.value = base;
+  ensureSelectContainsValue(elements.shortcutKeySelect, base);
   elements.shortcutPreview.value = wrapped;
+  elements.shortcutFriendlyPreview.value = readable;
 }
 
 function renderEditor() {
   const assignment = getSelectedAssignment();
-  elements.selectedKeyLabel.textContent = `Layer ${state.activeLayer + 1} - Key ${
+  elements.selectedKeyLabel.textContent = `Layer ${state.activeLayer + 1} - Tasto ${
     state.selectedKey + 1
   }`;
   elements.actionType.value = assignment.type;
   renderEditorSections(assignment.type);
 
   if (assignment.type === "keycode") {
-    elements.keycodeInput.value = sanitizeKeycode(assignment.keycode);
+    const keycode = sanitizeKeycode(assignment.keycode);
+    elements.keycodeInput.value = keycode;
+    ensureSelectContainsValue(elements.keycodeSelect, keycode);
   }
 
   if (assignment.type === "shortcut") {
@@ -357,7 +588,10 @@ function renderEditor() {
     document.querySelectorAll(".modifier").forEach((checkbox) => {
       checkbox.checked = selectedSet.has(checkbox.value);
     });
-    elements.shortcutKeyInput.value = sanitizeKeycode(assignment.keycode);
+
+    const keycode = sanitizeKeycode(assignment.keycode);
+    elements.shortcutKeyInput.value = keycode;
+    ensureSelectContainsValue(elements.shortcutKeySelect, keycode);
     updateShortcutPreview();
   }
 
@@ -381,7 +615,7 @@ function renderMacroList() {
     const nameInput = document.createElement("input");
     nameInput.value = macro.name;
     nameInput.placeholder = macro.id;
-    nameInput.setAttribute("aria-label", `Name for ${macro.id}`);
+    nameInput.setAttribute("aria-label", `Nome ${macro.id}`);
     nameInput.addEventListener("input", (event) => {
       macro.name = String(event.target.value || "").trim() || macro.id;
       renderMacroSelect();
@@ -392,12 +626,12 @@ function renderMacroList() {
     const removeButton = document.createElement("button");
     removeButton.type = "button";
     removeButton.className = "remove-macro";
-    removeButton.textContent = "Remove";
+    removeButton.textContent = "Rimuovi";
     removeButton.addEventListener("click", () => {
       state.macros = state.macros.filter((item) => item.id !== macro.id);
       ensureValidMacroAssignments();
       renderAll();
-      setStatus(`Removed ${macro.id}`);
+      setStatus(`Macro ${macro.id} rimossa.`);
     });
 
     header.append(nameInput, removeButton);
@@ -405,7 +639,7 @@ function renderMacroList() {
     const body = document.createElement("textarea");
     body.value = macro.body;
     body.placeholder =
-      "Macro body. Example: GUI+r\\nchrome\\nEnter (for your own reference).";
+      "Testo macro. Esempio: GUI+r\\nchrome\\nEnter (promemoria personale).";
     body.addEventListener("input", (event) => {
       macro.body = String(event.target.value || "");
       renderPreview();
@@ -458,17 +692,22 @@ function updateSelectedAssignmentFromEditor() {
   const actionType = elements.actionType.value;
 
   if (actionType === "keycode") {
+    const keycode = sanitizeKeycode(elements.keycodeInput.value || elements.keycodeSelect.value);
+    elements.keycodeInput.value = keycode;
+    ensureSelectContainsValue(elements.keycodeSelect, keycode);
     setSelectedAssignment({
       type: "keycode",
-      keycode: sanitizeKeycode(elements.keycodeInput.value),
+      keycode,
     });
   } else if (actionType === "shortcut") {
-    const modifiers = Array.from(document.querySelectorAll(".modifier:checked")).map(
-      (checkbox) => checkbox.value,
+    const modifiers = sanitizeShortcutModifiers(getCheckedModifiers());
+    const keycode = sanitizeKeycode(
+      elements.shortcutKeyInput.value || elements.shortcutKeySelect.value,
     );
-    const normalizedModifiers = sanitizeShortcutModifiers(modifiers);
-    const keycode = sanitizeKeycode(elements.shortcutKeyInput.value);
-    setSelectedAssignment({ type: "shortcut", modifiers: normalizedModifiers, keycode });
+    elements.shortcutKeyInput.value = keycode;
+    ensureSelectContainsValue(elements.shortcutKeySelect, keycode);
+    setSelectedAssignment({ type: "shortcut", modifiers, keycode });
+    updateShortcutPreview();
   } else if (actionType === "macro") {
     if (state.macros.length === 0) {
       const id = generateNextMacroId();
@@ -488,9 +727,9 @@ function updateSelectedAssignmentFromEditor() {
 function saveToLocalStorage() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(buildExportPayload()));
-    setStatus("Saved profile in browser storage.");
+    setStatus("Profilo salvato nel browser.");
   } catch (error) {
-    setStatus("Could not save profile in local storage.");
+    setStatus("Impossibile salvare nel browser.");
   }
 }
 
@@ -499,7 +738,7 @@ function loadFromLocalStorage({ silent = false } = {}) {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       if (!silent) {
-        setStatus("No saved profile found in browser storage.");
+        setStatus("Nessun profilo locale trovato.");
       }
       return;
     }
@@ -508,11 +747,11 @@ function loadFromLocalStorage({ silent = false } = {}) {
     ensureValidMacroAssignments();
     renderAll();
     if (!silent) {
-      setStatus("Loaded profile from browser storage.");
+      setStatus("Profilo caricato dal browser.");
     }
   } catch (error) {
     if (!silent) {
-      setStatus("Failed to load profile from browser storage.");
+      setStatus("Caricamento locale non riuscito.");
     }
   }
 }
@@ -526,7 +765,7 @@ function exportJsonFile() {
   anchor.download = `${state.profileName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.json`;
   anchor.click();
   URL.revokeObjectURL(url);
-  setStatus("Downloaded profile JSON.");
+  setStatus("JSON scaricato.");
 }
 
 function importJsonFile(file) {
@@ -541,12 +780,19 @@ function importJsonFile(file) {
       state = normalizeImportedState(parsed);
       ensureValidMacroAssignments();
       renderAll();
-      setStatus("Imported profile JSON.");
+      setStatus("Profilo importato.");
     } catch (error) {
-      setStatus("Import failed: invalid JSON file.");
+      setStatus("Import non riuscito: JSON non valido.");
     }
   };
   reader.readAsText(file);
+}
+
+function initializeFriendlyInputs() {
+  populateFriendlyKeySelect(elements.keycodeSelect);
+  populateFriendlyKeySelect(elements.shortcutKeySelect);
+  ensureSelectContainsValue(elements.keycodeSelect, "KC_NO");
+  ensureSelectContainsValue(elements.shortcutKeySelect, "KC_NO");
 }
 
 function bindEvents() {
@@ -571,7 +817,7 @@ function bindEvents() {
     const nextCount = clamp(Math.round(parsed), 1, MAX_KEY_COUNT);
     resizeLayers(nextCount);
     renderAll();
-    setStatus(`Updated key count to ${nextCount}.`);
+    setStatus(`Numero tasti aggiornato a ${nextCount}.`);
   });
 
   elements.actionType.addEventListener("change", () => {
@@ -580,9 +826,53 @@ function bindEvents() {
     renderEditor();
   });
 
-  elements.keycodeInput.addEventListener("input", updateSelectedAssignmentFromEditor);
+  elements.keycodeSelect.addEventListener("change", () => {
+    const selectedCode = sanitizeKeycode(elements.keycodeSelect.value);
+    elements.keycodeInput.value = selectedCode;
+    updateSelectedAssignmentFromEditor();
+  });
+
+  elements.keycodeInput.addEventListener("input", () => {
+    const typed = normalizeTypedKeycode(elements.keycodeInput.value);
+    if (!typed) {
+      return;
+    }
+    elements.keycodeInput.value = typed;
+    ensureSelectContainsValue(elements.keycodeSelect, typed);
+    updateSelectedAssignmentFromEditor();
+  });
+
+  elements.keycodeInput.addEventListener("blur", () => {
+    const code = sanitizeKeycode(elements.keycodeInput.value || elements.keycodeSelect.value);
+    elements.keycodeInput.value = code;
+    ensureSelectContainsValue(elements.keycodeSelect, code);
+    updateSelectedAssignmentFromEditor();
+  });
+
+  elements.shortcutKeySelect.addEventListener("change", () => {
+    const selectedCode = sanitizeKeycode(elements.shortcutKeySelect.value);
+    elements.shortcutKeyInput.value = selectedCode;
+    updateShortcutPreview();
+    updateSelectedAssignmentFromEditor();
+  });
 
   elements.shortcutKeyInput.addEventListener("input", () => {
+    const typed = normalizeTypedKeycode(elements.shortcutKeyInput.value);
+    if (!typed) {
+      return;
+    }
+    elements.shortcutKeyInput.value = typed;
+    ensureSelectContainsValue(elements.shortcutKeySelect, typed);
+    updateShortcutPreview();
+    updateSelectedAssignmentFromEditor();
+  });
+
+  elements.shortcutKeyInput.addEventListener("blur", () => {
+    const code = sanitizeKeycode(
+      elements.shortcutKeyInput.value || elements.shortcutKeySelect.value,
+    );
+    elements.shortcutKeyInput.value = code;
+    ensureSelectContainsValue(elements.shortcutKeySelect, code);
     updateShortcutPreview();
     updateSelectedAssignmentFromEditor();
   });
@@ -600,7 +890,7 @@ function bindEvents() {
     const id = generateNextMacroId();
     state.macros.push({ id, name: `Macro ${id.slice(1)}`, body: "" });
     renderAll();
-    setStatus(`Added ${id}.`);
+    setStatus(`Aggiunta ${id}.`);
   });
 
   elements.saveLocalButton.addEventListener("click", saveToLocalStorage);
@@ -608,7 +898,7 @@ function bindEvents() {
   elements.resetButton.addEventListener("click", () => {
     state = buildDefaultState();
     renderAll();
-    setStatus("Reset profile.");
+    setStatus("Profilo resettato.");
   });
   elements.exportButton.addEventListener("click", exportJsonFile);
   elements.importInput.addEventListener("change", (event) => {
@@ -618,6 +908,7 @@ function bindEvents() {
   });
 }
 
+initializeFriendlyInputs();
 bindEvents();
 loadFromLocalStorage({ silent: true });
 renderAll();
