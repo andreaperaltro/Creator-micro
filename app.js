@@ -1,7 +1,9 @@
 const STORAGE_KEY = "creator-micro-mapper-profile-v1";
 const DEFAULT_KEY_COUNT = 12;
 const DEFAULT_LAYER_COUNT = 3;
+const DEFAULT_KNOB_COUNT = 3;
 const MAX_KEY_COUNT = 64;
+const MAX_KNOB_COUNT = 8;
 const MODIFIER_ORDER = ["LCTL", "LSFT", "LALT", "LGUI"];
 const MODIFIER_NAMES = {
   LCTL: "Ctrl",
@@ -117,6 +119,22 @@ const FRIENDLY_KEY_GROUPS = [
       { code: "KC_MPRV", label: "Traccia precedente" },
     ],
   },
+  {
+    label: "Mouse / Trackpad",
+    keys: [
+      { code: "KC_WH_U", label: "Scroll su" },
+      { code: "KC_WH_D", label: "Scroll giu" },
+      { code: "KC_WH_L", label: "Scroll sinistra" },
+      { code: "KC_WH_R", label: "Scroll destra" },
+      { code: "KC_MS_U", label: "Mouse su" },
+      { code: "KC_MS_D", label: "Mouse giu" },
+      { code: "KC_MS_L", label: "Mouse sinistra" },
+      { code: "KC_MS_R", label: "Mouse destra" },
+      { code: "KC_BTN1", label: "Click sinistro" },
+      { code: "KC_BTN2", label: "Click destro" },
+      { code: "KC_BTN3", label: "Click centrale" },
+    ],
+  },
 ];
 
 const KEY_LABEL_BY_CODE = new Map();
@@ -136,6 +154,9 @@ const elements = {
   exportButton: document.getElementById("exportButton"),
   importInput: document.getElementById("importInput"),
   statusMessage: document.getElementById("statusMessage"),
+  knobCount: document.getElementById("knobCount"),
+  encoderList: document.getElementById("encoderList"),
+  applyScrollPresetButton: document.getElementById("applyScrollPresetButton"),
   keyGrid: document.getElementById("keyGrid"),
   selectedKeyLabel: document.getElementById("selectedKeyLabel"),
   actionType: document.getElementById("actionType"),
@@ -160,19 +181,35 @@ function buildDefaultState() {
   const layers = Array.from({ length: DEFAULT_LAYER_COUNT }, () =>
     createLayer(DEFAULT_KEY_COUNT),
   );
+  const encoders = Array.from({ length: DEFAULT_LAYER_COUNT }, () =>
+    createEncoderLayer(DEFAULT_KNOB_COUNT),
+  );
 
   return {
     profileName: "Creator Micro Profile",
     keyCount: DEFAULT_KEY_COUNT,
+    knobCount: DEFAULT_KNOB_COUNT,
     activeLayer: 0,
     selectedKey: 0,
     layers,
+    encoders,
     macros: [],
   };
 }
 
 function createLayer(keyCount) {
   return Array.from({ length: keyCount }, () => createDefaultAssignment());
+}
+
+function createDefaultEncoderBinding() {
+  return {
+    ccw: "KC_NO",
+    cw: "KC_NO",
+  };
+}
+
+function createEncoderLayer(knobCount) {
+  return Array.from({ length: knobCount }, () => createDefaultEncoderBinding());
 }
 
 function createDefaultAssignment() {
@@ -400,6 +437,17 @@ function sanitizeAssignment(raw) {
   };
 }
 
+function sanitizeEncoderBinding(raw) {
+  if (!raw || typeof raw !== "object") {
+    return createDefaultEncoderBinding();
+  }
+
+  return {
+    ccw: sanitizeKeycode(raw.ccw),
+    cw: sanitizeKeycode(raw.cw),
+  };
+}
+
 function sanitizeMacro(rawMacro, index) {
   if (typeof rawMacro === "string") {
     const macro = {
@@ -478,13 +526,38 @@ function normalizeImportedState(raw) {
   const macros = macrosRaw.map((macro, index) => sanitizeMacro(macro, index));
   coerceMacroTokensInLayers(layers, macros);
 
+  const sourceEncoders = Array.isArray(raw?.encoders)
+    ? raw.encoders
+    : Array.isArray(raw?.viaPreview?.encoders)
+      ? raw.viaPreview.encoders
+      : [];
+  const sourceKnobCount = Number(
+    raw?.knobCount || sourceEncoders?.[0]?.length || DEFAULT_KNOB_COUNT,
+  );
+  const knobCount = clamp(
+    Number.isFinite(sourceKnobCount) ? sourceKnobCount : DEFAULT_KNOB_COUNT,
+    1,
+    MAX_KNOB_COUNT,
+  );
+  const encoders = Array.from({ length: layerCount }, (_, layerIndex) => {
+    const sourceLayer = Array.isArray(sourceEncoders[layerIndex])
+      ? sourceEncoders[layerIndex]
+      : [];
+
+    return Array.from({ length: knobCount }, (_, knobIndex) =>
+      sanitizeEncoderBinding(sourceLayer[knobIndex]),
+    );
+  });
+
   return {
     profileName:
       String(raw?.profileName || "").trim() || "Creator Micro Imported Profile",
     keyCount,
+    knobCount,
     activeLayer: clamp(Number(raw?.activeLayer || 0), 0, layerCount - 1),
     selectedKey: clamp(Number(raw?.selectedKey || 0), 0, keyCount - 1),
     layers,
+    encoders,
     macros,
   };
 }
@@ -521,6 +594,18 @@ function resizeLayers(nextKeyCount) {
 
   state.keyCount = nextKeyCount;
   state.selectedKey = clamp(state.selectedKey, 0, nextKeyCount - 1);
+}
+
+function resizeEncoders(nextKnobCount) {
+  state.encoders = state.encoders.map((layer) => {
+    const resized = Array.from({ length: nextKnobCount }, (_, index) => {
+      const current = layer[index];
+      return current ? sanitizeEncoderBinding(current) : createDefaultEncoderBinding();
+    });
+    return resized;
+  });
+
+  state.knobCount = nextKnobCount;
 }
 
 function ensureValidMacroAssignments() {
@@ -655,6 +740,89 @@ function renderGrid() {
       renderEditor();
     });
     elements.keyGrid.appendChild(button);
+  });
+}
+
+function ensureEncoderStateConsistency() {
+  const normalizedKnobCount = clamp(
+    Number.isFinite(Number(state.knobCount)) ? Math.round(Number(state.knobCount)) : DEFAULT_KNOB_COUNT,
+    1,
+    MAX_KNOB_COUNT,
+  );
+  state.knobCount = normalizedKnobCount;
+
+  if (!Array.isArray(state.encoders)) {
+    state.encoders = [];
+  }
+
+  while (state.encoders.length < state.layers.length) {
+    state.encoders.push(createEncoderLayer(state.knobCount));
+  }
+  if (state.encoders.length > state.layers.length) {
+    state.encoders = state.encoders.slice(0, state.layers.length);
+  }
+
+  state.encoders = state.encoders.map((layer) =>
+    Array.from({ length: state.knobCount }, (_, index) =>
+      sanitizeEncoderBinding(layer?.[index]),
+    ),
+  );
+}
+
+function renderEncoderList() {
+  ensureEncoderStateConsistency();
+  elements.encoderList.textContent = "";
+  const activeEncoderLayer = state.encoders[state.activeLayer] || createEncoderLayer(state.knobCount);
+
+  activeEncoderLayer.forEach((binding, knobIndex) => {
+    const wrapper = document.createElement("article");
+    wrapper.className = "encoder-item";
+
+    const title = document.createElement("h3");
+    title.className = "encoder-title";
+    title.textContent = `Knob ${knobIndex + 1}`;
+
+    const grid = document.createElement("div");
+    grid.className = "encoder-grid";
+
+    const ccwField = document.createElement("div");
+    ccwField.className = "field-group";
+    const ccwLabel = document.createElement("label");
+    ccwLabel.textContent = "Giro a sinistra (CCW)";
+    const ccwSelect = document.createElement("select");
+    populateFriendlyKeySelect(ccwSelect);
+    ensureSelectContainsValue(ccwSelect, binding.ccw);
+    ccwSelect.addEventListener("change", () => {
+      binding.ccw = sanitizeKeycode(ccwSelect.value);
+      renderEncoderList();
+      renderPreview();
+    });
+    ccwField.append(ccwLabel, ccwSelect);
+
+    const cwField = document.createElement("div");
+    cwField.className = "field-group";
+    const cwLabel = document.createElement("label");
+    cwLabel.textContent = "Giro a destra (CW)";
+    const cwSelect = document.createElement("select");
+    populateFriendlyKeySelect(cwSelect);
+    ensureSelectContainsValue(cwSelect, binding.cw);
+    cwSelect.addEventListener("change", () => {
+      binding.cw = sanitizeKeycode(cwSelect.value);
+      renderEncoderList();
+      renderPreview();
+    });
+    cwField.append(cwLabel, cwSelect);
+
+    grid.append(ccwField, cwField);
+
+    const preview = document.createElement("p");
+    preview.className = "encoder-preview";
+    preview.textContent = `CCW: ${keycodeToFriendlyLabel(binding.ccw)} · CW: ${keycodeToFriendlyLabel(
+      binding.cw,
+    )}`;
+
+    wrapper.append(title, grid, preview);
+    elements.encoderList.appendChild(wrapper);
   });
 }
 
@@ -1115,8 +1283,15 @@ function renderMacroList() {
 }
 
 function buildExportPayload() {
+  ensureEncoderStateConsistency();
   const exportedLayers = state.layers.map((layer) => layer.map((item) => cloneAssignment(item)));
   const viaLayers = state.layers.map((layer) => layer.map(assignmentToViaToken));
+  const exportedEncoders = state.encoders.map((layer) =>
+    layer.map((binding) => sanitizeEncoderBinding(binding)),
+  );
+  const viaEncoderMap = exportedEncoders.map((layer) =>
+    layer.map((binding) => `ENCODER_CCW_CW(${binding.ccw}, ${binding.cw})`),
+  );
   const exportedMacros = state.macros.map((macro) => {
     if (!Array.isArray(macro.steps)) {
       macro.steps = [];
@@ -1139,13 +1314,17 @@ function buildExportPayload() {
     device: "Work Louder Creator Micro",
     profileName: state.profileName,
     keyCount: state.keyCount,
+    knobCount: state.knobCount,
     activeLayer: state.activeLayer,
     selectedKey: state.selectedKey,
     exportedAt: new Date().toISOString(),
     layers: exportedLayers,
+    encoders: exportedEncoders,
     macros: exportedMacros,
     viaPreview: {
       layers: viaLayers,
+      encoders: exportedEncoders,
+      encoderMap: viaEncoderMap,
       macros: exportedMacros.map((macro) => macro.body),
     },
   };
@@ -1159,8 +1338,10 @@ function renderPreview() {
 function renderAll() {
   elements.profileName.value = state.profileName;
   elements.keyCount.value = String(state.keyCount);
+  elements.knobCount.value = String(state.knobCount);
   renderLayerSelect();
   renderGrid();
+  renderEncoderList();
   renderMacroSelect();
   renderMacroList();
   renderEditor();
@@ -1283,6 +1464,7 @@ function bindEvents() {
   elements.layerSelect.addEventListener("change", (event) => {
     state.activeLayer = clamp(Number(event.target.value), 0, state.layers.length - 1);
     renderGrid();
+    renderEncoderList();
     renderEditor();
     renderPreview();
   });
@@ -1297,6 +1479,18 @@ function bindEvents() {
     resizeLayers(nextCount);
     renderAll();
     setStatus(`Numero tasti aggiornato a ${nextCount}.`);
+  });
+
+  elements.knobCount.addEventListener("change", (event) => {
+    const parsed = Number(event.target.value);
+    if (!Number.isFinite(parsed)) {
+      elements.knobCount.value = String(state.knobCount);
+      return;
+    }
+    const nextCount = clamp(Math.round(parsed), 1, MAX_KNOB_COUNT);
+    resizeEncoders(nextCount);
+    renderAll();
+    setStatus(`Numero knob aggiornato a ${nextCount}.`);
   });
 
   elements.actionType.addEventListener("change", () => {
@@ -1370,6 +1564,18 @@ function bindEvents() {
     state.macros.push(createMacro(id, `Macro ${id.slice(1)}`));
     renderAll();
     setStatus(`Aggiunta ${id}.`);
+  });
+
+  elements.applyScrollPresetButton.addEventListener("click", () => {
+    ensureEncoderStateConsistency();
+    const activeLayerEncoders = state.encoders[state.activeLayer];
+    for (const encoder of activeLayerEncoders) {
+      encoder.ccw = "KC_WH_U";
+      encoder.cw = "KC_WH_D";
+    }
+    renderEncoderList();
+    renderPreview();
+    setStatus("Preset scroll applicato ai knob del layer corrente.");
   });
 
   elements.saveLocalButton.addEventListener("click", saveToLocalStorage);

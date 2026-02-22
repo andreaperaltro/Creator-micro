@@ -175,6 +175,35 @@ button,
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent), transparent 75%);
 }
 
+.encoder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.encoder-item {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.6rem;
+}
+
+.encoder-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.encoder-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.encoder-preview {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
 .editor-section.hidden {
   display: none;
 }
@@ -390,5 +419,9 @@ button,
 
   .output-panel {
     grid-column: auto;
+  }
+
+  .encoder-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -8,6 +8,7 @@ The interface lets you:
 - assign each key with friendly names (Italian-oriented labels), without typing `KC_*`
 - build shortcuts visually with modifiers (for example `Ctrl + Maiusc + S`)
 - define macros with a visual step composer (key, shortcut, text, delay) plus quick presets
+- map knob/encoder rotation (CCW/CW), including mouse wheel scroll up/down
 - export/import your profile as JSON
 - save/load your profile in browser local storage
 
@@ -48,7 +49,8 @@ If your production branch is `main`, merge these changes into `main` first.
    - **Scorciatoia**: select modifiers + base key
    - **Macro**: choose one of the macros from the macro panel
 4. Add/edit macros in the **Macros** panel with visual steps.
-5. Export JSON when done.
+5. Configure **Knobs / Encoders** for CCW/CW actions (for example `Scroll su` / `Scroll giu`).
+6. Export JSON when done.
 
 ## About VIA compatibility
 
