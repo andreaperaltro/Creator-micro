@@ -876,6 +876,7 @@ function buildEncoderDirectionEditor({
       keycode: currentAction.keycode,
       modifiers: currentAction.modifiers,
     });
+    setStatus(`${title}: aggiornato tipo azione.`);
     renderEncoderList();
     renderPreview();
   });
@@ -895,6 +896,7 @@ function buildEncoderDirectionEditor({
     if (typeof onBindingChanged === "function") {
       onBindingChanged();
     }
+    setStatus(`${title}: aggiornata azione base.`);
     renderPreview();
   });
   keyField.append(keyLabel, keySelect);
@@ -921,6 +923,7 @@ function buildEncoderDirectionEditor({
         if (typeof onBindingChanged === "function") {
           onBindingChanged();
         }
+        setStatus(`${title}: aggiornati modificatori.`);
         renderPreview();
       });
       const text = document.createElement("span");
