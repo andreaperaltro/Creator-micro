@@ -24,6 +24,21 @@ No build step is required.
 
 3. Browse to `http://localhost:8080`
 
+## Deploy on Vercel
+
+This repo is a static site, so Vercel should serve files directly from the repo root.
+
+Recommended Vercel project settings:
+
+- **Framework Preset**: `Other`
+- **Root Directory**: `.`
+- **Build Command**: *(empty)*
+- **Output Directory**: *(empty)*
+- **Install Command**: *(empty)*
+
+Also ensure Vercel deploys the branch that contains the app (`index.html`, `app.js`, `styles.css`).
+If your production branch is `main`, merge these changes into `main` first.
+
 ## How to use
 
 1. Choose a layer.
