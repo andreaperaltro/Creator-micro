@@ -856,33 +856,6 @@ function buildEncoderDirectionEditor({
   const action = sanitizeEncoderAction(binding[directionKey]);
   binding[directionKey] = action;
 
-  const typeField = document.createElement("div");
-  typeField.className = "field-group compact";
-  const typeLabel = document.createElement("label");
-  typeLabel.textContent = "Tipo azione";
-  const typeSelect = document.createElement("select");
-  const keyOption = document.createElement("option");
-  keyOption.value = "keycode";
-  keyOption.textContent = "Tasto singolo";
-  const shortcutOption = document.createElement("option");
-  shortcutOption.value = "shortcut";
-  shortcutOption.textContent = "Scorciatoia";
-  typeSelect.append(keyOption, shortcutOption);
-  typeSelect.value = action.type;
-  typeSelect.addEventListener("change", () => {
-    const nextType = typeSelect.value === "shortcut" ? "shortcut" : "keycode";
-    const currentAction = sanitizeEncoderAction(binding[directionKey]);
-    binding[directionKey] = createEncoderAction(nextType, {
-      keycode: currentAction.keycode,
-      modifiers: currentAction.modifiers,
-    });
-    setStatus(`${title}: aggiornato tipo azione.`);
-    renderEncoderList();
-    renderPreview();
-  });
-  typeField.append(typeLabel, typeSelect);
-  directionWrapper.appendChild(typeField);
-
   const keyField = document.createElement("div");
   keyField.className = "field-group compact";
   const keyLabel = document.createElement("label");
@@ -890,56 +863,65 @@ function buildEncoderDirectionEditor({
   const keySelect = document.createElement("select");
   populateFriendlyKeySelect(keySelect);
   ensureSelectContainsValue(keySelect, action.keycode);
-  keySelect.addEventListener("change", () => {
-    binding[directionKey].keycode = sanitizeKeycode(keySelect.value);
+  keyField.append(keyLabel, keySelect);
+  directionWrapper.appendChild(keyField);
+
+  const modifiersHint = document.createElement("p");
+  modifiersHint.className = "encoder-direction-hint";
+  modifiersHint.textContent =
+    "Modificatori facoltativi: se ne selezioni uno o piu, l'azione diventa una scorciatoia.";
+  directionWrapper.appendChild(modifiersHint);
+
+  const modifiersRow = document.createElement("div");
+  modifiersRow.className = "encoder-modifiers";
+  const modifierSet = new Set(sanitizeShortcutModifiers(action.modifiers));
+
+  MODIFIER_ORDER.forEach((modifier) => {
+    const label = document.createElement("label");
+    label.className = "encoder-modifier-pill";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = modifier;
+    checkbox.checked = modifierSet.has(modifier);
+    const text = document.createElement("span");
+    text.textContent = MODIFIER_NAMES[modifier] || modifier;
+    label.append(checkbox, text);
+    modifiersRow.appendChild(label);
+  });
+  directionWrapper.appendChild(modifiersRow);
+
+  const preview = document.createElement("p");
+  preview.className = "encoder-direction-preview";
+  function syncEncoderDirectionFromControls() {
+    const nextModifiers = Array.from(
+      modifiersRow.querySelectorAll("input:checked"),
+    ).map((input) => input.value);
+    const normalizedModifiers = sanitizeShortcutModifiers(nextModifiers);
+    const nextKeycode = sanitizeKeycode(keySelect.value);
+    const nextType = normalizedModifiers.length > 0 ? "shortcut" : "keycode";
+    binding[directionKey] = createEncoderAction(nextType, {
+      keycode: nextKeycode,
+      modifiers: normalizedModifiers,
+    });
+
     refreshDirectionPreview();
     if (typeof onBindingChanged === "function") {
       onBindingChanged();
     }
-    setStatus(`${title}: aggiornata azione base.`);
+    setStatus(`${title}: aggiornato.`);
     renderPreview();
-  });
-  keyField.append(keyLabel, keySelect);
-  directionWrapper.appendChild(keyField);
-
-  if (action.type === "shortcut") {
-    const modifiersRow = document.createElement("div");
-    modifiersRow.className = "encoder-modifiers";
-    const modifierSet = new Set(sanitizeShortcutModifiers(action.modifiers));
-
-    MODIFIER_ORDER.forEach((modifier) => {
-      const label = document.createElement("label");
-      label.className = "encoder-modifier-pill";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.value = modifier;
-      checkbox.checked = modifierSet.has(modifier);
-      checkbox.addEventListener("change", () => {
-        const nextModifiers = Array.from(
-          modifiersRow.querySelectorAll("input:checked"),
-        ).map((input) => input.value);
-        binding[directionKey].modifiers = sanitizeShortcutModifiers(nextModifiers);
-        refreshDirectionPreview();
-        if (typeof onBindingChanged === "function") {
-          onBindingChanged();
-        }
-        setStatus(`${title}: aggiornati modificatori.`);
-        renderPreview();
-      });
-      const text = document.createElement("span");
-      text.textContent = MODIFIER_NAMES[modifier] || modifier;
-      label.append(checkbox, text);
-      modifiersRow.appendChild(label);
-    });
-
-    directionWrapper.appendChild(modifiersRow);
   }
 
-  const preview = document.createElement("p");
-  preview.className = "encoder-direction-preview";
+  keySelect.addEventListener("change", syncEncoderDirectionFromControls);
+  modifiersRow.querySelectorAll("input").forEach((checkbox) => {
+    checkbox.addEventListener("change", syncEncoderDirectionFromControls);
+  });
+
   function refreshDirectionPreview() {
-    preview.textContent = `Output: ${encoderActionToLabel(binding[directionKey])} (${encoderActionToViaToken(
-      binding[directionKey],
+    const current = sanitizeEncoderAction(binding[directionKey]);
+    const modeLabel = current.type === "shortcut" ? "Scorciatoia" : "Tasto singolo";
+    preview.textContent = `${modeLabel}: ${encoderActionToLabel(current)} (${encoderActionToViaToken(
+      current,
     )})`;
   }
   refreshDirectionPreview();
