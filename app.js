@@ -9,6 +9,14 @@ const MODIFIER_NAMES = {
   LALT: "Alt",
   LGUI: "Cmd/Win",
 };
+const MAX_MACRO_DELAY_MS = 10000;
+const DEFAULT_MACRO_DELAY_MS = 120;
+const MACRO_STEP_KIND_OPTIONS = [
+  { value: "key", label: "Tasto" },
+  { value: "shortcut", label: "Scorciatoia" },
+  { value: "text", label: "Testo" },
+  { value: "delay", label: "Pausa" },
+];
 
 const LETTER_KEYS = Array.from("ABCDEFGHIJKLMNOPQRSTUVWXYZ", (letter) => ({
   code: `KC_${letter}`,
@@ -210,6 +218,123 @@ function sanitizeShortcutModifiers(modifiers) {
   return unique;
 }
 
+function buildShortcutToken(modifiers, keycode) {
+  const base = sanitizeKeycode(keycode);
+  return sanitizeShortcutModifiers(modifiers).reduceRight(
+    (wrapped, modifier) => `${modifier}(${wrapped})`,
+    base,
+  );
+}
+
+function generateMacroStepId() {
+  const randomPart = Math.random().toString(36).slice(2, 7);
+  return `S${Date.now().toString(36)}${randomPart}`;
+}
+
+function createMacroStep(kind = "key", seed = {}) {
+  const id = sanitizeMacroId(seed.id) || generateMacroStepId();
+
+  if (kind === "shortcut") {
+    return {
+      id,
+      kind: "shortcut",
+      modifiers: sanitizeShortcutModifiers(seed.modifiers),
+      keycode: sanitizeKeycode(seed.keycode),
+    };
+  }
+
+  if (kind === "text") {
+    return {
+      id,
+      kind: "text",
+      text: String(seed.text || ""),
+    };
+  }
+
+  if (kind === "delay") {
+    const parsed = Number(seed.ms);
+    const ms = clamp(
+      Number.isFinite(parsed) ? Math.round(parsed) : DEFAULT_MACRO_DELAY_MS,
+      0,
+      MAX_MACRO_DELAY_MS,
+    );
+    return { id, kind: "delay", ms };
+  }
+
+  return {
+    id,
+    kind: "key",
+    keycode: sanitizeKeycode(seed.keycode),
+  };
+}
+
+function sanitizeMacroStep(rawStep, index) {
+  const fallbackId = `S${index + 1}`;
+
+  if (typeof rawStep === "string") {
+    return createMacroStep("text", { id: fallbackId, text: rawStep });
+  }
+
+  if (!rawStep || typeof rawStep !== "object") {
+    return createMacroStep("key", { id: fallbackId });
+  }
+
+  const kind = String(rawStep.kind || "").trim().toLowerCase();
+  if (!["key", "shortcut", "text", "delay"].includes(kind)) {
+    return createMacroStep("text", {
+      id: sanitizeMacroId(rawStep.id) || fallbackId,
+      text: String(rawStep.text || rawStep.body || ""),
+    });
+  }
+
+  return createMacroStep(kind, {
+    id: sanitizeMacroId(rawStep.id) || fallbackId,
+    keycode: rawStep.keycode,
+    modifiers: rawStep.modifiers,
+    text: rawStep.text,
+    ms: rawStep.ms,
+  });
+}
+
+function macroStepToBodyLine(step) {
+  if (step.kind === "shortcut") {
+    return `TAP(${buildShortcutToken(step.modifiers, step.keycode)})`;
+  }
+
+  if (step.kind === "text") {
+    return `TYPE(${JSON.stringify(String(step.text || ""))})`;
+  }
+
+  if (step.kind === "delay") {
+    const ms = clamp(Math.round(Number(step.ms) || 0), 0, MAX_MACRO_DELAY_MS);
+    return `DELAY(${ms})`;
+  }
+
+  return `TAP(${sanitizeKeycode(step.keycode)})`;
+}
+
+function buildMacroBodyFromSteps(steps) {
+  if (!Array.isArray(steps) || steps.length === 0) {
+    return "";
+  }
+  return steps.map((step) => macroStepToBodyLine(step)).join("\n");
+}
+
+function refreshMacroBody(macro) {
+  macro.body = buildMacroBodyFromSteps(macro.steps || []);
+}
+
+function createMacro(id, name) {
+  const macro = {
+    id,
+    name,
+    steps: [],
+    body: "",
+  };
+  refreshMacroBody(macro);
+  return macro;
+}
+
 function parseWrappedShortcutToken(token) {
   const normalized = sanitizeKeycode(token);
   const modifiers = [];
@@ -277,17 +402,33 @@ function sanitizeAssignment(raw) {
 
 function sanitizeMacro(rawMacro, index) {
   if (typeof rawMacro === "string") {
-    return {
+    const macro = {
       id: `M${index + 1}`,
       name: `Macro ${index + 1}`,
-      body: rawMacro,
+      steps: rawMacro ? [createMacroStep("text", { text: rawMacro })] : [],
+      body: "",
     };
+    refreshMacroBody(macro);
+    return macro;
   }
 
   const name = String(rawMacro?.name || "").trim() || `Macro ${index + 1}`;
-  const body = String(rawMacro?.body || "");
   const id = sanitizeMacroId(rawMacro?.id) || `M${index + 1}`;
-  return { id, name, body };
+  const importedSteps = Array.isArray(rawMacro?.steps) ? rawMacro.steps : null;
+  let steps = [];
+
+  if (importedSteps) {
+    steps = importedSteps.map((step, stepIndex) => sanitizeMacroStep(step, stepIndex));
+  } else {
+    const legacyBody = String(rawMacro?.body || "");
+    if (legacyBody.length > 0) {
+      steps = [createMacroStep("text", { text: legacyBody })];
+    }
+  }
+
+  const macro = { id, name, steps, body: "" };
+  refreshMacroBody(macro);
+  return macro;
 }
 
 function coerceMacroTokensInLayers(layers, macros) {
@@ -463,11 +604,7 @@ function assignmentToViaToken(assignment) {
   }
 
   if (assignment.type === "shortcut") {
-    const base = sanitizeKeycode(assignment.keycode);
-    return sanitizeShortcutModifiers(assignment.modifiers).reduceRight(
-      (wrapped, modifier) => `${modifier}(${wrapped})`,
-      base,
-    );
+    return buildShortcutToken(assignment.modifiers, assignment.keycode);
   }
 
   return sanitizeKeycode(assignment.keycode);
@@ -554,10 +691,7 @@ function updateShortcutPreview() {
   const modifiers = getCheckedModifiers();
   const normalizedModifiers = sanitizeShortcutModifiers(modifiers);
   const base = sanitizeKeycode(elements.shortcutKeyInput.value || elements.shortcutKeySelect.value);
-  const wrapped = normalizedModifiers.reduceRight(
-    (current, modifier) => `${modifier}(${current})`,
-    base,
-  );
+  const wrapped = buildShortcutToken(normalizedModifiers, base);
   const readable = [...normalizedModifiers.map((m) => MODIFIER_NAMES[m] || m), keycodeToFriendlyLabel(base)].join(
     " + ",
   );
@@ -603,9 +737,22 @@ function renderEditor() {
   }
 }
 
+function readableShortcutLabel(modifiers, keycode) {
+  const modifierLabels = sanitizeShortcutModifiers(modifiers).map(
+    (modifier) => MODIFIER_NAMES[modifier] || modifier,
+  );
+  return [...modifierLabels, keycodeToFriendlyLabel(keycode)].join(" + ");
+}
+
 function renderMacroList() {
   elements.macroList.textContent = "";
   state.macros.forEach((macro) => {
+    if (!Array.isArray(macro.steps)) {
+      macro.steps = [];
+    }
+    macro.steps = macro.steps.map((step, stepIndex) => sanitizeMacroStep(step, stepIndex));
+    refreshMacroBody(macro);
+
     const wrapper = document.createElement("article");
     wrapper.className = "macro-item";
 
@@ -635,17 +782,297 @@ function renderMacroList() {
     });
 
     header.append(nameInput, removeButton);
+    wrapper.appendChild(header);
 
-    const body = document.createElement("textarea");
-    body.value = macro.body;
-    body.placeholder =
-      "Testo macro. Esempio: GUI+r\\nchrome\\nEnter (promemoria personale).";
-    body.addEventListener("input", (event) => {
-      macro.body = String(event.target.value || "");
-      renderPreview();
+    const toolbar = document.createElement("div");
+    toolbar.className = "macro-toolbar";
+
+    const addStepButtons = [
+      { kind: "key", label: "+ Tasto" },
+      { kind: "shortcut", label: "+ Scorciatoia" },
+      { kind: "text", label: "+ Testo" },
+      { kind: "delay", label: "+ Pausa" },
+    ];
+
+    addStepButtons.forEach((buttonConfig) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "ghost-button";
+      button.textContent = buttonConfig.label;
+      button.addEventListener("click", () => {
+        macro.steps.push(createMacroStep(buttonConfig.kind));
+        refreshMacroBody(macro);
+        renderMacroList();
+        renderPreview();
+      });
+      toolbar.appendChild(button);
     });
 
-    wrapper.append(header, body);
+    wrapper.appendChild(toolbar);
+
+    const stepsContainer = document.createElement("div");
+    stepsContainer.className = "macro-steps";
+
+    if (macro.steps.length === 0) {
+      const emptyMessage = document.createElement("p");
+      emptyMessage.className = "macro-empty";
+      emptyMessage.textContent =
+        "Nessuno step. Aggiungi un Tasto, Scorciatoia, Testo o Pausa.";
+      stepsContainer.appendChild(emptyMessage);
+    }
+
+    macro.steps.forEach((step, stepIndex) => {
+      const card = document.createElement("div");
+      card.className = "macro-step";
+
+      const topRow = document.createElement("div");
+      topRow.className = "macro-step-top";
+
+      const leftGroup = document.createElement("div");
+      leftGroup.className = "macro-step-left";
+
+      const indexBadge = document.createElement("span");
+      indexBadge.className = "macro-step-index";
+      indexBadge.textContent = `Step ${stepIndex + 1}`;
+
+      const typeSelect = document.createElement("select");
+      typeSelect.className = "macro-step-type";
+      MACRO_STEP_KIND_OPTIONS.forEach((optionConfig) => {
+        const option = document.createElement("option");
+        option.value = optionConfig.value;
+        option.textContent = optionConfig.label;
+        typeSelect.appendChild(option);
+      });
+      typeSelect.value = step.kind;
+      typeSelect.addEventListener("change", (event) => {
+        const nextKind = String(event.target.value || "key");
+        macro.steps[stepIndex] = createMacroStep(nextKind, {
+          id: step.id,
+          keycode: step.keycode,
+          modifiers: step.modifiers,
+          text: step.text,
+          ms: step.ms,
+        });
+        refreshMacroBody(macro);
+        renderMacroList();
+        renderPreview();
+      });
+
+      leftGroup.append(indexBadge, typeSelect);
+
+      const actions = document.createElement("div");
+      actions.className = "macro-step-actions";
+
+      const upButton = document.createElement("button");
+      upButton.type = "button";
+      upButton.className = "ghost-button";
+      upButton.textContent = "↑";
+      upButton.disabled = stepIndex === 0;
+      upButton.addEventListener("click", () => {
+        const previous = macro.steps[stepIndex - 1];
+        macro.steps[stepIndex - 1] = macro.steps[stepIndex];
+        macro.steps[stepIndex] = previous;
+        refreshMacroBody(macro);
+        renderMacroList();
+        renderPreview();
+      });
+
+      const downButton = document.createElement("button");
+      downButton.type = "button";
+      downButton.className = "ghost-button";
+      downButton.textContent = "↓";
+      downButton.disabled = stepIndex === macro.steps.length - 1;
+      downButton.addEventListener("click", () => {
+        const next = macro.steps[stepIndex + 1];
+        macro.steps[stepIndex + 1] = macro.steps[stepIndex];
+        macro.steps[stepIndex] = next;
+        refreshMacroBody(macro);
+        renderMacroList();
+        renderPreview();
+      });
+
+      const cloneButton = document.createElement("button");
+      cloneButton.type = "button";
+      cloneButton.className = "ghost-button";
+      cloneButton.textContent = "Duplica";
+      cloneButton.addEventListener("click", () => {
+        const duplicated = createMacroStep(step.kind, {
+          keycode: step.keycode,
+          modifiers: step.modifiers,
+          text: step.text,
+          ms: step.ms,
+        });
+        macro.steps.splice(stepIndex + 1, 0, duplicated);
+        refreshMacroBody(macro);
+        renderMacroList();
+        renderPreview();
+      });
+
+      const removeStepButton = document.createElement("button");
+      removeStepButton.type = "button";
+      removeStepButton.className = "remove-macro-step";
+      removeStepButton.textContent = "Elimina";
+      removeStepButton.addEventListener("click", () => {
+        macro.steps.splice(stepIndex, 1);
+        refreshMacroBody(macro);
+        renderMacroList();
+        renderPreview();
+      });
+
+      actions.append(upButton, downButton, cloneButton, removeStepButton);
+
+      topRow.append(leftGroup, actions);
+      card.appendChild(topRow);
+
+      const editor = document.createElement("div");
+      editor.className = "macro-step-editor";
+
+      if (step.kind === "key") {
+        const keySelect = document.createElement("select");
+        populateFriendlyKeySelect(keySelect);
+        ensureSelectContainsValue(keySelect, step.keycode);
+        keySelect.addEventListener("change", () => {
+          step.keycode = sanitizeKeycode(keySelect.value);
+          refreshMacroBody(macro);
+          renderPreview();
+        });
+
+        const helper = document.createElement("p");
+        helper.className = "macro-step-preview";
+        helper.textContent = `Invia: ${keycodeToFriendlyLabel(step.keycode)}`;
+        keySelect.addEventListener("change", () => {
+          helper.textContent = `Invia: ${keycodeToFriendlyLabel(step.keycode)}`;
+        });
+
+        editor.append(keySelect, helper);
+      }
+
+      if (step.kind === "shortcut") {
+        const modifiersRow = document.createElement("div");
+        modifiersRow.className = "macro-shortcut-modifiers";
+        const selectedModifiers = new Set(sanitizeShortcutModifiers(step.modifiers));
+        const modifierCheckboxes = [];
+
+        MODIFIER_ORDER.forEach((modifier) => {
+          const label = document.createElement("label");
+          label.className = "macro-modifier-pill";
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.value = modifier;
+          checkbox.checked = selectedModifiers.has(modifier);
+
+          const text = document.createElement("span");
+          text.textContent = MODIFIER_NAMES[modifier] || modifier;
+
+          label.append(checkbox, text);
+          modifiersRow.appendChild(label);
+          modifierCheckboxes.push(checkbox);
+        });
+
+        const baseSelect = document.createElement("select");
+        populateFriendlyKeySelect(baseSelect);
+        ensureSelectContainsValue(baseSelect, step.keycode);
+
+        const readableLine = document.createElement("p");
+        readableLine.className = "macro-step-preview";
+
+        const viaLine = document.createElement("p");
+        viaLine.className = "macro-step-preview technical";
+
+        const refreshShortcutStep = () => {
+          step.modifiers = sanitizeShortcutModifiers(
+            modifierCheckboxes.filter((input) => input.checked).map((input) => input.value),
+          );
+          step.keycode = sanitizeKeycode(baseSelect.value);
+
+          readableLine.textContent = `Scorciatoia: ${readableShortcutLabel(
+            step.modifiers,
+            step.keycode,
+          )}`;
+          viaLine.textContent = `Codice VIA: ${buildShortcutToken(step.modifiers, step.keycode)}`;
+
+          refreshMacroBody(macro);
+          renderPreview();
+        };
+
+        modifierCheckboxes.forEach((input) => input.addEventListener("change", refreshShortcutStep));
+        baseSelect.addEventListener("change", refreshShortcutStep);
+        refreshShortcutStep();
+
+        editor.append(modifiersRow, baseSelect, readableLine, viaLine);
+      }
+
+      if (step.kind === "text") {
+        const textArea = document.createElement("textarea");
+        textArea.className = "macro-step-text";
+        textArea.rows = 3;
+        textArea.placeholder = "Testo da digitare...";
+        textArea.value = String(step.text || "");
+        textArea.addEventListener("input", () => {
+          step.text = String(textArea.value || "");
+          refreshMacroBody(macro);
+          renderPreview();
+        });
+
+        editor.appendChild(textArea);
+      }
+
+      if (step.kind === "delay") {
+        const delayRow = document.createElement("div");
+        delayRow.className = "macro-delay-row";
+
+        const range = document.createElement("input");
+        range.type = "range";
+        range.min = "0";
+        range.max = String(MAX_MACRO_DELAY_MS);
+        range.step = "10";
+
+        const number = document.createElement("input");
+        number.type = "number";
+        number.min = "0";
+        number.max = String(MAX_MACRO_DELAY_MS);
+        number.step = "10";
+
+        const syncDelay = (value) => {
+          const parsed = Number(value);
+          const ms = clamp(
+            Number.isFinite(parsed) ? Math.round(parsed) : DEFAULT_MACRO_DELAY_MS,
+            0,
+            MAX_MACRO_DELAY_MS,
+          );
+          step.ms = ms;
+          range.value = String(ms);
+          number.value = String(ms);
+          refreshMacroBody(macro);
+          renderPreview();
+        };
+
+        syncDelay(step.ms);
+
+        range.addEventListener("input", () => syncDelay(range.value));
+        number.addEventListener("input", () => syncDelay(number.value));
+
+        delayRow.append(range, number);
+        editor.appendChild(delayRow);
+      }
+
+      card.appendChild(editor);
+      stepsContainer.appendChild(card);
+    });
+
+    wrapper.appendChild(stepsContainer);
+
+    const technicalDetails = document.createElement("details");
+    technicalDetails.className = "advanced-details";
+    const summary = document.createElement("summary");
+    summary.textContent = "Anteprima tecnica macro";
+    const pre = document.createElement("pre");
+    pre.className = "macro-technical";
+    pre.textContent = macro.body || "(macro vuota)";
+    technicalDetails.append(summary, pre);
+
+    wrapper.appendChild(technicalDetails);
     elements.macroList.appendChild(wrapper);
   });
 }
@@ -653,6 +1080,21 @@ function renderMacroList() {
 function buildExportPayload() {
   const exportedLayers = state.layers.map((layer) => layer.map((item) => cloneAssignment(item)));
   const viaLayers = state.layers.map((layer) => layer.map(assignmentToViaToken));
+  const exportedMacros = state.macros.map((macro) => {
+    if (!Array.isArray(macro.steps)) {
+      macro.steps = [];
+    }
+    macro.steps = macro.steps.map((step, stepIndex) => sanitizeMacroStep(step, stepIndex));
+    refreshMacroBody(macro);
+    return JSON.parse(
+      JSON.stringify({
+        id: macro.id,
+        name: macro.name,
+        body: macro.body,
+        steps: macro.steps,
+      }),
+    );
+  });
 
   return {
     version: 1,
@@ -664,10 +1106,10 @@ function buildExportPayload() {
     selectedKey: state.selectedKey,
     exportedAt: new Date().toISOString(),
     layers: exportedLayers,
-    macros: state.macros.map((macro) => ({ ...macro })),
+    macros: exportedMacros,
     viaPreview: {
       layers: viaLayers,
-      macros: state.macros.map((macro) => macro.body),
+      macros: exportedMacros.map((macro) => macro.body),
     },
   };
 }
@@ -711,7 +1153,7 @@ function updateSelectedAssignmentFromEditor() {
   } else if (actionType === "macro") {
     if (state.macros.length === 0) {
       const id = generateNextMacroId();
-      state.macros.push({ id, name: `Macro ${id.slice(1)}`, body: "" });
+      state.macros.push(createMacro(id, `Macro ${id.slice(1)}`));
     }
     setSelectedAssignment({
       type: "macro",
@@ -888,7 +1330,7 @@ function bindEvents() {
 
   elements.addMacroButton.addEventListener("click", () => {
     const id = generateNextMacroId();
-    state.macros.push({ id, name: `Macro ${id.slice(1)}`, body: "" });
+    state.macros.push(createMacro(id, `Macro ${id.slice(1)}`));
     renderAll();
     setStatus(`Aggiunta ${id}.`);
   });

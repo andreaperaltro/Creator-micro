@@ -236,6 +236,131 @@ button,
   border: none;
 }
 
+.macro-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+}
+
+.ghost-button {
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--border);
+}
+
+.macro-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.macro-empty {
+  margin: 0.2rem 0 0.4rem;
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.macro-step {
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.55rem;
+}
+
+.macro-step-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.macro-step-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.macro-step-index {
+  font-size: 0.82rem;
+  opacity: 0.85;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+}
+
+.macro-step-type {
+  min-width: 150px;
+}
+
+.macro-step-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.remove-macro-step {
+  background: var(--danger);
+  border: none;
+}
+
+.macro-step-editor {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.macro-step-text {
+  min-height: 88px;
+}
+
+.macro-shortcut-modifiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.macro-modifier-pill {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.86rem;
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.macro-step-preview {
+  margin: 0;
+  font-size: 0.86rem;
+  opacity: 0.9;
+}
+
+.macro-step-preview.technical {
+  opacity: 0.78;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+}
+
+.macro-delay-row {
+  display: grid;
+  grid-template-columns: 1fr 110px;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.macro-technical {
+  margin: 0.55rem 0 0;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.82rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+}
+
 .output-panel {
   grid-column: 1 / -1;
 }

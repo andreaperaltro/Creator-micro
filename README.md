@@ -5,9 +5,9 @@ using **VIA/QMK-style keycodes**.
 
 The interface lets you:
 
-- assign each key to a keycode (`KC_A`, `KC_MUTE`, etc.)
-- build shortcuts with modifiers (for example `LCTL(LSFT(KC_S))`)
-- define macros and map keys to those macros
+- assign each key with friendly names (Italian-oriented labels), without typing `KC_*`
+- build shortcuts visually with modifiers (for example `Ctrl + Maiusc + S`)
+- define macros with a visual step composer (key, shortcut, text, delay)
 - export/import your profile as JSON
 - save/load your profile in browser local storage
 
@@ -44,10 +44,10 @@ If your production branch is `main`, merge these changes into `main` first.
 1. Choose a layer.
 2. Click a key in the layout grid.
 3. In **Key Editor**, choose action type:
-   - **Keycode**: enter a VIA/QMK keycode (`KC_A`, `KC_TAB`, ...)
-   - **Shortcut**: select modifiers + base keycode
+   - **Tasto singolo**: choose a key from readable labels
+   - **Scorciatoia**: select modifiers + base key
    - **Macro**: choose one of the macros from the macro panel
-4. Add/edit macros in the **Macros** panel.
+4. Add/edit macros in the **Macros** panel with visual steps.
 5. Export JSON when done.
 
 ## About VIA compatibility
