@@ -243,6 +243,24 @@ button,
   margin-bottom: 0.55rem;
 }
 
+.macro-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.55rem;
+}
+
+.macro-presets-label {
+  font-size: 0.84rem;
+  opacity: 0.82;
+}
+
+.preset-button {
+  padding: 0.32rem 0.52rem;
+  font-size: 0.84rem;
+}
+
 .ghost-button {
   background: transparent;
   color: inherit;

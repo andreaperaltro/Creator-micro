@@ -7,7 +7,7 @@ The interface lets you:
 
 - assign each key with friendly names (Italian-oriented labels), without typing `KC_*`
 - build shortcuts visually with modifiers (for example `Ctrl + Maiusc + S`)
-- define macros with a visual step composer (key, shortcut, text, delay)
+- define macros with a visual step composer (key, shortcut, text, delay) plus quick presets
 - export/import your profile as JSON
 - save/load your profile in browser local storage
 

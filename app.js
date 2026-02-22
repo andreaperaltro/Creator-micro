@@ -810,6 +810,43 @@ function renderMacroList() {
 
     wrapper.appendChild(toolbar);
 
+    const presetBar = document.createElement("div");
+    presetBar.className = "macro-presets";
+    const presetLabel = document.createElement("span");
+    presetLabel.className = "macro-presets-label";
+    presetLabel.textContent = "Preset rapidi:";
+    presetBar.appendChild(presetLabel);
+
+    const presets = [
+      { label: "Copia", modifiers: ["LCTL"], keycode: "KC_C" },
+      { label: "Incolla", modifiers: ["LCTL"], keycode: "KC_V" },
+      { label: "Taglia", modifiers: ["LCTL"], keycode: "KC_X" },
+      { label: "Salva", modifiers: ["LCTL"], keycode: "KC_S" },
+      { label: "Annulla", modifiers: ["LCTL"], keycode: "KC_Z" },
+      { label: "Trova", modifiers: ["LCTL"], keycode: "KC_F" },
+    ];
+
+    presets.forEach((preset) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "ghost-button preset-button";
+      button.textContent = preset.label;
+      button.addEventListener("click", () => {
+        macro.steps.push(
+          createMacroStep("shortcut", {
+            modifiers: preset.modifiers,
+            keycode: preset.keycode,
+          }),
+        );
+        refreshMacroBody(macro);
+        renderMacroList();
+        renderPreview();
+      });
+      presetBar.appendChild(button);
+    });
+
+    wrapper.appendChild(presetBar);
+
     const stepsContainer = document.createElement("div");
     stepsContainer.className = "macro-steps";
 
