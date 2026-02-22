@@ -38,20 +38,6 @@
           <label for="knobCount">Knob / Encoder Count</label>
           <input id="knobCount" type="number" min="1" max="2" />
         </div>
-
-        <div class="button-row">
-          <button id="saveLocalButton" type="button">Save Local</button>
-          <button id="loadLocalButton" type="button">Load Local</button>
-          <button id="resetButton" type="button" class="danger">Reset</button>
-        </div>
-
-        <div class="button-row">
-          <button id="exportButton" type="button">Export JSON</button>
-          <label class="file-label" for="importInput">Import JSON</label>
-          <input id="importInput" type="file" accept="application/json" />
-        </div>
-
-        <p id="statusMessage" class="status"></p>
       </section>
 
       <section class="panel layout-panel">
@@ -162,6 +148,15 @@
         <p class="hint">
           This JSON captures your key assignments and macros for later import.
         </p>
+        <div class="button-row">
+          <button id="saveLocalButton" type="button">Save Local</button>
+          <button id="loadLocalButton" type="button">Load Local</button>
+          <button id="resetButton" type="button" class="danger">Reset</button>
+          <button id="exportButton" type="button">Export JSON</button>
+          <label class="file-label" for="importInput">Import JSON</label>
+          <input id="importInput" type="file" accept="application/json" />
+        </div>
+        <p id="statusMessage" class="status"></p>
         <textarea id="jsonPreview" readonly></textarea>
       </section>
     </main>

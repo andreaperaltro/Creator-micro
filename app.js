@@ -843,6 +843,7 @@ function buildEncoderDirectionEditor({
   binding,
   directionKey,
   title,
+  onBindingChanged,
 }) {
   const directionWrapper = document.createElement("div");
   directionWrapper.className = "encoder-direction";
@@ -870,9 +871,10 @@ function buildEncoderDirectionEditor({
   typeSelect.value = action.type;
   typeSelect.addEventListener("change", () => {
     const nextType = typeSelect.value === "shortcut" ? "shortcut" : "keycode";
+    const currentAction = sanitizeEncoderAction(binding[directionKey]);
     binding[directionKey] = createEncoderAction(nextType, {
-      keycode: action.keycode,
-      modifiers: action.modifiers,
+      keycode: currentAction.keycode,
+      modifiers: currentAction.modifiers,
     });
     renderEncoderList();
     renderPreview();
@@ -889,7 +891,10 @@ function buildEncoderDirectionEditor({
   ensureSelectContainsValue(keySelect, action.keycode);
   keySelect.addEventListener("change", () => {
     binding[directionKey].keycode = sanitizeKeycode(keySelect.value);
-    renderEncoderList();
+    refreshDirectionPreview();
+    if (typeof onBindingChanged === "function") {
+      onBindingChanged();
+    }
     renderPreview();
   });
   keyField.append(keyLabel, keySelect);
@@ -912,7 +917,10 @@ function buildEncoderDirectionEditor({
           modifiersRow.querySelectorAll("input:checked"),
         ).map((input) => input.value);
         binding[directionKey].modifiers = sanitizeShortcutModifiers(nextModifiers);
-        renderEncoderList();
+        refreshDirectionPreview();
+        if (typeof onBindingChanged === "function") {
+          onBindingChanged();
+        }
         renderPreview();
       });
       const text = document.createElement("span");
@@ -926,9 +934,12 @@ function buildEncoderDirectionEditor({
 
   const preview = document.createElement("p");
   preview.className = "encoder-direction-preview";
-  preview.textContent = `Output: ${encoderActionToLabel(binding[directionKey])} (${encoderActionToViaToken(
-    binding[directionKey],
-  )})`;
+  function refreshDirectionPreview() {
+    preview.textContent = `Output: ${encoderActionToLabel(binding[directionKey])} (${encoderActionToViaToken(
+      binding[directionKey],
+    )})`;
+  }
+  refreshDirectionPreview();
   directionWrapper.appendChild(preview);
 
   parent.appendChild(directionWrapper);
@@ -950,11 +961,20 @@ function renderEncoderList() {
     const grid = document.createElement("div");
     grid.className = "encoder-grid";
 
+    const preview = document.createElement("p");
+    preview.className = "encoder-preview";
+    const refreshEncoderPreview = () => {
+      preview.textContent = `CCW: ${encoderActionToLabel(binding.ccw)} · CW: ${encoderActionToLabel(
+        binding.cw,
+      )}`;
+    };
+
     buildEncoderDirectionEditor({
       parent: grid,
       binding,
       directionKey: "ccw",
       title: "Giro a sinistra (CCW)",
+      onBindingChanged: refreshEncoderPreview,
     });
 
     buildEncoderDirectionEditor({
@@ -962,13 +982,10 @@ function renderEncoderList() {
       binding,
       directionKey: "cw",
       title: "Giro a destra (CW)",
+      onBindingChanged: refreshEncoderPreview,
     });
 
-    const preview = document.createElement("p");
-    preview.className = "encoder-preview";
-    preview.textContent = `CCW: ${encoderActionToLabel(binding.ccw)} · CW: ${encoderActionToLabel(
-      binding.cw,
-    )}`;
+    refreshEncoderPreview();
 
     wrapper.append(title, grid, preview);
     elements.encoderList.appendChild(wrapper);
